@@ -6,10 +6,12 @@ ARG TARGETARCH=amd64
 ARG VERSION=dev
 ARG COMMIT=dev
 WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
-RUN go mod download \
+RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags "-s -w -X github.com/any-hub/any-hub/internal/version.Version=${VERSION} -X github.com/any-hub/any-hub/internal/version.Commit=${COMMIT}" -o /out/any-hub /src/cmd/any-hub
+    go build -trimpath -ldflags "-s -w -X github.com/any-hub/any-hub/internal/version.Version=${VERSION} -X github.com/any-hub/any-hub/internal/version.Commit=${COMMIT}" -o /out/any-hub ./cmd/any-hub
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=builder /out/any-hub /usr/local/bin/any-hub
