@@ -1,0 +1,9 @@
+ListenPort = 0
+LogLevel = "info"
+StoragePath = "./data"
+
+[[Hub]]
+Name = "docker"
+Domain = "docker.local"
+Upstream = ""
+Type = ""

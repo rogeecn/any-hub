@@ -1,0 +1,24 @@
+# 全局配置，适用于所有 Hub
+ListenPort = 5000             # 所有 Hub 共享的监听端口
+LogLevel = "info"
+LogFilePath = "./logs/any-hub.log"
+LogMaxSize = 100
+LogMaxBackups = 10
+LogCompress = true
+StoragePath = "./storage"      # 磁盘缓存根目录，按 Hub/路径 划分
+CacheTTL = 86400               # 全局缓存 TTL（秒），用于判断命中/过期
+MaxMemoryCacheSize = 268435456 # 256MB
+MaxRetries = 3
+InitialBackoff = "1s"
+UpstreamTimeout = "30s"
+
+[[Hub]]
+Name = "docker"
+Domain = "docker.hub.local"
+Upstream = "https://registry-1.docker.io"
+Proxy = ""
+Type = "docker"                      # 必填：docker|npm|go
+Username = ""                 # 可选：若填写需与 Password 同时出现
+Password = ""
+CacheTTL = 43200               # 可选: 覆盖全局缓存 TTL（秒）
+EnableHeadCheck = true

@@ -1,0 +1,71 @@
+# Global Settings
+ListenPort = 5000
+LogLevel = "info"
+LogFilePath = ""
+LogMaxSize = 100
+LogMaxBackups = 10
+LogCompress = true
+StoragePath = "./storage"
+CacheTTL = 86400
+MaxMemoryCacheSize = 268435456 # 256MB
+MaxRetries = 3
+InitialBackoff = "1s"
+UpstreamTimeout = "30s"
+
+# Upstream Registries
+[[Hub]]
+Domain = "docker.hub.local"
+Name = "docker"
+Upstream = "https://registry-1.docker.io"
+Proxy = ""
+Type = "docker"
+Username = ""
+Password = ""
+
+[[Hub]]
+Domain = "ghcr.hub.local"
+Name = "ghcr"
+Upstream = "https://ghcr.io"
+Proxy = ""
+Type = "docker"
+Username = ""
+Password = ""
+
+[[Hub]]
+Domain = "quay.hub.local"
+Name = "quay"
+Upstream = "https://quay.io"
+Proxy = ""
+Type = "docker"
+Username = ""
+Password = ""
+
+# Go Modules
+[[Hub]]
+Domain = "go.hub.local"
+Name = "go"
+Upstream = "https://proxy.golang.org"
+Proxy = ""
+Type = "go"
+Username = ""
+Password = ""
+
+# NPM Registry
+[[Hub]]
+Domain = "npm.hub.local"
+Name = "npm"
+Upstream = "https://registry.npmjs.org"
+Proxy = ""
+Type = "npm"
+Username = ""
+Password = ""
+
+# PyPI Registry
+[[Hub]]
+Domain = "pypi.hub.local"
+Name = "pypi"
+Upstream = "https://pypi.org"
+Proxy = ""
+Username = ""
+Password = ""
+Type = "npm"

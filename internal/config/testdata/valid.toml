@@ -1,0 +1,9 @@
+ListenPort = 5050
+LogLevel = "debug"
+StoragePath = "./data"
+
+[[Hub]]
+Name = "docker"
+Domain = "docker.local"
+Upstream = "https://registry-1.docker.io"
+Type = "docker"

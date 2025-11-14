@@ -1,0 +1,9 @@
+# Exclude build context noise and secrets
+.git/
+node_modules/
+coverage/
+*.log*
+.env*
+.dockerignore
+Dockerfile*
+

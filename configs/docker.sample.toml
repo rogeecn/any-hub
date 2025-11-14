@@ -1,0 +1,21 @@
+# Docker Hub 代理示例配置
+# 使用前请在 /etc/hosts 中为 docker.hub.local 配置 127.0.0.1，
+# 并根据需要调整 StoragePath/ListenPort 等字段。
+
+ListenPort = 5000
+LogLevel = "info"
+LogFilePath = "./logs/docker-proxy.log"
+StoragePath = "./storage/docker"
+CacheTTL = 86400
+UpstreamTimeout = "30s"
+
+[[Hub]]
+Name = "docker"
+Domain = "docker.hub.local"
+Upstream = "https://registry-1.docker.io"
+Proxy = ""
+Type = "docker"           # docker|npm|go
+Username = ""
+Password = ""
+CacheTTL = 43200
+EnableHeadCheck = true

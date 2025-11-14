@@ -1,0 +1,21 @@
+# NPM Registry 代理示例配置
+# 使用前请在 /etc/hosts 中为 npm.hub.local 配置 127.0.0.1，
+# 并根据需要调整 StoragePath/ListenPort 等字段。
+
+ListenPort = 5000
+LogLevel = "info"
+LogFilePath = "./logs/npm-proxy.log"
+StoragePath = "./storage/npm"
+CacheTTL = 86400
+UpstreamTimeout = "30s"
+
+[[Hub]]
+Name = "npm"
+Domain = "npm.hub.local"
+Upstream = "https://registry.npmjs.org"
+Proxy = ""
+Type = "npm"              # docker|npm|go
+Username = ""
+Password = ""
+CacheTTL = 43200
+EnableHeadCheck = false
