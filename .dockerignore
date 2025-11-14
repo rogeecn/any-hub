@@ -1,9 +1,26 @@
-# Exclude build context noise and secrets
-.git/
+# Build metadata and VCS noise
+.git
+.github
+.codex
 node_modules/
 coverage/
+logs
+storage
 *.log*
-.env*
-.dockerignore
-Dockerfile*
+*.out
 
+# Local configs or secrets
+.env*
+config.toml
+config.*.toml
+configs/*.toml
+
+# Editor and tooling noise
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Tests and docs not needed at runtime
+/specs
+/tests
