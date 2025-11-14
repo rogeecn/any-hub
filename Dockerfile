@@ -9,7 +9,7 @@ WORKDIR /src
 COPY . .
 RUN go mod download \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags "-s -w -X github.com/any-hub/any-hub/internal/version.Version=${VERSION} -X github.com/any-hub/any-hub/internal/version.Commit=${COMMIT}" -o /out/any-hub ./cmd/any-hub
+    go build -trimpath -ldflags "-s -w -X github.com/any-hub/any-hub/internal/version.Version=${VERSION} -X github.com/any-hub/any-hub/internal/version.Commit=${COMMIT}" -o /out/any-hub /src/cmd/any-hub
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=builder /out/any-hub /usr/local/bin/any-hub
