@@ -67,9 +67,11 @@ type HubConfig struct {
 	Upstream        string   `mapstructure:"Upstream"`
 	Proxy           string   `mapstructure:"Proxy"`
 	Type            string   `mapstructure:"Type"`
+	Module          string   `mapstructure:"Module"`
 	Username        string   `mapstructure:"Username"`
 	Password        string   `mapstructure:"Password"`
 	CacheTTL        Duration `mapstructure:"CacheTTL"`
+	ValidationMode  string   `mapstructure:"ValidationMode"`
 	EnableHeadCheck bool     `mapstructure:"EnableHeadCheck"`
 }
 

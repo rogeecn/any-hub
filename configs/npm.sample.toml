@@ -15,6 +15,7 @@ Domain = "npm.hub.local"
 Upstream = "https://registry.npmjs.org"
 Proxy = ""
 Type = "npm"              # docker|npm|go
+Module = "legacy"
 Username = ""
 Password = ""
 CacheTTL = 43200

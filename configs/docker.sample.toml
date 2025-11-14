@@ -15,6 +15,7 @@ Domain = "docker.hub.local"
 Upstream = "https://registry-1.docker.io"
 Proxy = ""
 Type = "docker"           # docker|npm|go
+Module = "legacy"
 Username = ""
 Password = ""
 CacheTTL = 43200

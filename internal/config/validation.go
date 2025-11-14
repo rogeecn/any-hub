@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/any-hub/any-hub/internal/hubmodule"
 )
 
 var supportedHubTypes = map[string]struct{}{
@@ -73,6 +75,24 @@ func (c *Config) Validate() error {
 			return newFieldError(hubField(hub.Name, "Type"), "仅支持 "+supportedHubTypeList)
 		}
 		hub.Type = normalizedType
+
+		moduleKey := strings.ToLower(strings.TrimSpace(hub.Module))
+		if moduleKey == "" {
+			moduleKey = hubmodule.DefaultModuleKey()
+		}
+		if _, ok := hubmodule.Resolve(moduleKey); !ok {
+			return newFieldError(hubField(hub.Name, "Module"), fmt.Sprintf("未注册模块: %s", moduleKey))
+		}
+		hub.Module = moduleKey
+		if hub.ValidationMode != "" {
+			mode := strings.ToLower(strings.TrimSpace(hub.ValidationMode))
+			switch mode {
+			case string(hubmodule.ValidationModeETag), string(hubmodule.ValidationModeLastModified), string(hubmodule.ValidationModeNever):
+				hub.ValidationMode = mode
+			default:
+				return newFieldError(hubField(hub.Name, "ValidationMode"), "仅支持 etag/last-modified/never")
+			}
+		}
 
 		if (hub.Username == "") != (hub.Password == "") {
 			return newFieldError(hubField(hub.Name, "Username/Password"), "必须同时提供或同时留空")

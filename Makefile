@@ -1,7 +1,7 @@
 GO       ?= /home/rogee/.local/go/bin/go
 GOCACHE  ?= /tmp/go-build
 
-.PHONY: build fmt test test-all run
+.PHONY: build fmt test test-all run modules-test
 
 build:
 	$(GO) build .
@@ -17,3 +17,6 @@ test-all:
 
 run:
 	$(GO) run . --config ./config.toml
+
+modules-test:
+	$(GO) test ./internal/hubmodule/...

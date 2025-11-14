@@ -1,0 +1,20 @@
+package legacy
+
+import "github.com/any-hub/any-hub/internal/hubmodule"
+
+// 模块描述：包装当前共享的代理 + 缓存实现，供未迁移的 Hub 使用。
+func init() {
+	hubmodule.MustRegister(hubmodule.ModuleMetadata{
+		Key:            hubmodule.DefaultModuleKey(),
+		Description:    "Legacy proxy + cache implementation bundled with any-hub",
+		MigrationState: hubmodule.MigrationStateLegacy,
+		SupportedProtocols: []string{
+			"docker", "npm", "go", "pypi",
+		},
+		CacheStrategy: hubmodule.CacheStrategyProfile{
+			DiskLayout:             ".body",
+			ValidationMode:         hubmodule.ValidationModeETag,
+			SupportsStreamingWrite: true,
+		},
+	})
+}

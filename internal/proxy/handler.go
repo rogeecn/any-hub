@@ -49,7 +49,10 @@ func (h *Handler) Handle(c fiber.Ctx, route *server.HubRoute) error {
 	policy := determineCachePolicy(route, locator, c.Method())
 
 	if err := ensureProxyHubType(route); err != nil {
-		h.logger.WithField("hub", route.Config.Name).WithError(err).Error("hub_type_unsupported")
+		h.logger.WithFields(logrus.Fields{
+			"hub":        route.Config.Name,
+			"module_key": route.ModuleKey,
+		}).WithError(err).Error("hub_type_unsupported")
 		return h.writeError(c, fiber.StatusNotImplemented, "hub_type_unsupported")
 	}
 
@@ -67,7 +70,9 @@ func (h *Handler) Handle(c fiber.Ctx, route *server.HubRoute) error {
 		case errors.Is(err, cache.ErrNotFound):
 			// miss, continue
 		default:
-			h.logger.WithError(err).WithField("hub", route.Config.Name).Warn("cache_get_failed")
+			h.logger.WithError(err).
+				WithFields(logrus.Fields{"hub": route.Config.Name, "module_key": route.ModuleKey}).
+				Warn("cache_get_failed")
 		}
 	}
 
@@ -76,7 +81,9 @@ func (h *Handler) Handle(c fiber.Ctx, route *server.HubRoute) error {
 		if policy.requireRevalidate {
 			fresh, err := h.isCacheFresh(c, route, locator, cached.Entry)
 			if err != nil {
-				h.logger.WithError(err).WithField("hub", route.Config.Name).Warn("cache_revalidate_failed")
+				h.logger.WithError(err).
+					WithFields(logrus.Fields{"hub": route.Config.Name, "module_key": route.ModuleKey}).
+					Warn("cache_revalidate_failed")
 				serve = false
 			} else if !fresh {
 				serve = false
@@ -316,7 +323,7 @@ func (h *Handler) writeError(c fiber.Ctx, status int, code string) error {
 }
 
 func (h *Handler) logResult(route *server.HubRoute, upstream string, requestID string, status int, cacheHit bool, started time.Time, err error) {
-	fields := logging.RequestFields(route.Config.Name, route.Config.Domain, route.Config.Type, route.Config.AuthMode(), cacheHit)
+	fields := logging.RequestFields(route.Config.Name, route.Config.Domain, route.Config.Type, route.Config.AuthMode(), route.ModuleKey, cacheHit)
 	fields["action"] = "proxy"
 	fields["upstream"] = upstream
 	fields["upstream_status"] = status
@@ -800,7 +807,7 @@ func isAuthFailure(status int) bool {
 }
 
 func (h *Handler) logAuthRetry(route *server.HubRoute, upstream string, requestID string, status int) {
-	fields := logging.RequestFields(route.Config.Name, route.Config.Domain, route.Config.Type, route.Config.AuthMode(), false)
+	fields := logging.RequestFields(route.Config.Name, route.Config.Domain, route.Config.Type, route.Config.AuthMode(), route.ModuleKey, false)
 	fields["action"] = "proxy_retry"
 	fields["upstream"] = upstream
 	fields["upstream_status"] = status
@@ -812,7 +819,7 @@ func (h *Handler) logAuthRetry(route *server.HubRoute, upstream string, requestI
 }
 
 func (h *Handler) logAuthFailure(route *server.HubRoute, upstream string, requestID string, status int) {
-	fields := logging.RequestFields(route.Config.Name, route.Config.Domain, route.Config.Type, route.Config.AuthMode(), false)
+	fields := logging.RequestFields(route.Config.Name, route.Config.Domain, route.Config.Type, route.Config.AuthMode(), route.ModuleKey, false)
 	fields["action"] = "proxy"
 	fields["upstream"] = upstream
 	fields["upstream_status"] = status

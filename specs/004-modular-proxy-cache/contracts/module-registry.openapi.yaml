@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: Any-Hub Module Registry API
+  version: 0.1.0
+  description: |
+    Internal diagnostics endpoint exposing registered proxy+cache modules and per-hub bindings.
+servers:
+  - url: http://localhost:3000
+paths:
+  /-/modules:
+    get:
+      summary: List registered modules and hub bindings
+      tags: [modules]
+      responses:
+        '200':
+          description: Module summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Module'
+                  hubs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HubBinding'
+  /-/modules/{key}:
+    get:
+      summary: Inspect a single module metadata record
+      tags: [modules]
+      parameters:
+        - in: path
+          name: key
+          schema:
+            type: string
+          required: true
+          description: Module key, e.g., npm-tarball
+      responses:
+        '200':
+          description: Module metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Module'
+        '404':
+          description: Module not found
+
+components:
+  schemas:
+    Module:
+      type: object
+      required: [key, description, migration_state, cache_strategy]
+      properties:
+        key:
+          type: string
+        description:
+          type: string
+        migration_state:
+          type: string
+          enum: [legacy, beta, ga]
+        supported_protocols:
+          type: array
+          items:
+            type: string
+        cache_strategy:
+          $ref: '#/components/schemas/CacheStrategy'
+    CacheStrategy:
+      type: object
+      properties:
+        ttl_seconds:
+          type: integer
+          minimum: 1
+        validation_mode:
+          type: string
+          enum: [etag, last-modified, never]
+        disk_layout:
+          type: string
+        requires_metadata_file:
+          type: boolean
+        supports_streaming_write:
+          type: boolean
+    HubBinding:
+      type: object
+      required: [hub_name, module_key, domain, port]
+      properties:
+        hub_name:
+          type: string
+        module_key:
+          type: string
+        domain:
+          type: string
+        port:
+          type: integer
+        rollout_flag:
+          type: string
+          enum: [legacy-only, dual, modular]

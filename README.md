@@ -38,19 +38,20 @@ Password = "s3cr3t"
 
 1. 复制 `configs/config.example.toml` 为工作目录下的 `config.toml` 并调整 `[[Hub]]` 配置：
    - 在全局段添加/修改 `ListenPort`，并从每个 Hub 中移除 `Port`。
-   - 为 Hub 填写 `Type`，并按需添加 `Username`/`Password`。
-   - 根据 quickstart 示例设置 `Domain`、`Upstream`、`StoragePath` 等字段。
+   - 为 Hub 填写 `Type`，并按需添加 `Module`（缺省为 `legacy`，自定义模块需在 `internal/hubmodule/<module-key>/` 注册）。
+   - 根据 quickstart 示例设置 `Domain`、`Upstream`、`StoragePath` 等字段，并按需添加 `Username`/`Password`。
 2. 参考 [`specs/003-hub-auth-fields/quickstart.md`](specs/003-hub-auth-fields/quickstart.md) 完成配置校验、凭证验证与日志检查。
 3. 常用命令：
    - `any-hub --check-config --config ./config.toml`
    - `any-hub --config ./config.toml`
    - `any-hub --version`
 
-## 示例代理
+## 模块化代理与示例
 
-- `configs/docker.sample.toml`、`configs/npm.sample.toml` 展示了 Docker/NPM 的最小配置，复制后即可按需调整 Domain、Type、StoragePath 与凭证。
-- 运行 `./scripts/demo-proxy.sh docker`（或 `npm`）即可加载示例配置并启动代理，便于快速验证 Host 路由与缓存命中。
-- 示例操作手册、常见问题参见 [`specs/003-hub-auth-fields/quickstart.md`](specs/003-hub-auth-fields/quickstart.md)。
+- `configs/docker.sample.toml`、`configs/npm.sample.toml` 展示了 Docker/NPM 的最小配置，包含新的 `Module` 字段，复制后即可按需调整。
+- 运行 `./scripts/demo-proxy.sh docker`（或 `npm`）即可加载示例配置并启动代理，日志中会附带 `module_key` 字段，便于确认命中的是 `legacy` 还是自定义模块。
+- 若需自定义模块，可复制 `internal/hubmodule/template/`、在 `init()` 中调用 `hubmodule.MustRegister` 描述 metadata，并通过 `proxy.RegisterModuleHandler` 注入模块专属的 `ProxyHandler`，最后运行 `make modules-test` 自检。
+- 示例操作手册、常见问题参见 [`specs/003-hub-auth-fields/quickstart.md`](specs/003-hub-auth-fields/quickstart.md) 以及本特性的 [`quickstart.md`](specs/004-modular-proxy-cache/quickstart.md)。
 
 ## CLI 标志
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/any-hub/any-hub/internal/config"
+	"github.com/any-hub/any-hub/internal/hubmodule"
 )
 
 // HubRoute 将 Hub 配置与派生属性（如缓存 TTL、解析后的 Upstream/Proxy URL）
@@ -24,6 +25,9 @@ type HubRoute struct {
 	// UpstreamURL/ProxyURL 在构造 Registry 时提前解析完成，便于后续请求快速复用。
 	UpstreamURL *url.URL
 	ProxyURL    *url.URL
+	// ModuleKey/Module 记录当前 hub 选用的模块及其元数据，便于日志与观测。
+	ModuleKey string
+	Module    hubmodule.ModuleMetadata
 }
 
 // HubRegistry 提供 Host/Host:port 到 HubRoute 的查询能力，所有 Hub 共享同一个监听端口。
@@ -96,6 +100,11 @@ func (r *HubRegistry) List() []HubRoute {
 }
 
 func buildHubRoute(cfg *config.Config, hub config.HubConfig) (*HubRoute, error) {
+	meta, err := moduleMetadataForHub(hub)
+	if err != nil {
+		return nil, fmt.Errorf("hub %s: %w", hub.Name, err)
+	}
+
 	upstreamURL, err := url.Parse(hub.Upstream)
 	if err != nil {
 		return nil, fmt.Errorf("invalid upstream for hub %s: %w", hub.Name, err)
@@ -115,6 +124,8 @@ func buildHubRoute(cfg *config.Config, hub config.HubConfig) (*HubRoute, error) 
 		CacheTTL:    cfg.EffectiveCacheTTL(hub),
 		UpstreamURL: upstreamURL,
 		ProxyURL:    proxyURL,
+		ModuleKey:   meta.Key,
+		Module:      meta,
 	}, nil
 }
 

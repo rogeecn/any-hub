@@ -5,10 +5,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
+
+	"github.com/any-hub/any-hub/internal/hubmodule"
 )
 
 // Load 读取并解析 TOML 配置文件，同时注入默认值与校验逻辑。
@@ -85,6 +88,14 @@ func applyGlobalDefaults(g *GlobalConfig) {
 func applyHubDefaults(h *HubConfig) {
 	if h.CacheTTL.DurationValue() < 0 {
 		h.CacheTTL = Duration(0)
+	}
+	if trimmed := strings.TrimSpace(h.Module); trimmed == "" {
+		h.Module = hubmodule.DefaultModuleKey()
+	} else {
+		h.Module = strings.ToLower(trimmed)
+	}
+	if h.ValidationMode == "" {
+		h.ValidationMode = string(hubmodule.ValidationModeETag)
 	}
 }
 

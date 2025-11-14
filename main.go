@@ -10,6 +10,7 @@ import (
 
 	"github.com/any-hub/any-hub/internal/cache"
 	"github.com/any-hub/any-hub/internal/config"
+	"github.com/any-hub/any-hub/internal/hubmodule"
 	"github.com/any-hub/any-hub/internal/logging"
 	"github.com/any-hub/any-hub/internal/proxy"
 	"github.com/any-hub/any-hub/internal/server"
@@ -81,6 +82,8 @@ func run(opts cliOptions) int {
 
 	httpClient := server.NewUpstreamClient(cfg)
 	proxyHandler := proxy.NewHandler(httpClient, logger, store)
+	forwarder := proxy.NewForwarder(proxyHandler)
+	proxy.RegisterModuleHandler(hubmodule.DefaultModuleKey(), proxyHandler)
 
 	fields := logging.BaseFields("startup", opts.configPath)
 	fields["hubs"] = len(cfg.Hubs)
@@ -89,7 +92,7 @@ func run(opts cliOptions) int {
 	fields["version"] = version.Full()
 	logger.WithFields(fields).Info("配置加载完成")
 
-	if err := startHTTPServer(cfg, registry, proxyHandler, logger); err != nil {
+	if err := startHTTPServer(cfg, registry, forwarder, logger); err != nil {
 		fmt.Fprintf(stdErr, "HTTP 服务启动失败: %v\n", err)
 		return 1
 	}
