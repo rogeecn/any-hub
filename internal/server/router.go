@@ -144,6 +144,8 @@ func ensureRouterHubType(route *HubRoute) error {
 		return nil
 	case "go":
 		return nil
+	case "pypi":
+		return nil
 	default:
 		return fmt.Errorf("unsupported hub type: %s", route.Config.Type)
 	}

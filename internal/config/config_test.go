@@ -59,6 +59,7 @@ func TestHubTypeValidation(t *testing.T) {
 		{"docker ok", "docker", false},
 		{"npm ok", "npm", false},
 		{"go ok", "go", false},
+		{"pypi ok", "pypi", false},
 		{"missing type", "", true},
 		{"unsupported type", "rubygems", true},
 	}

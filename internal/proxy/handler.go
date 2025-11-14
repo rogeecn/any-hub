@@ -345,6 +345,10 @@ func inferCachedContentType(route *server.HubRoute, locator cache.Locator) strin
 		return "application/octet-stream"
 	case strings.HasSuffix(clean, "/@v/list"):
 		return "text/plain"
+	case strings.HasSuffix(clean, ".whl"):
+		return "application/octet-stream"
+	case strings.HasSuffix(clean, ".tar.gz"), strings.HasSuffix(clean, ".tar.bz2"):
+		return "application/x-tar"
 	}
 
 	if route != nil {
@@ -363,6 +367,10 @@ func inferCachedContentType(route *server.HubRoute, locator cache.Locator) strin
 			if strings.HasSuffix(clean, ".json") {
 				return "application/json"
 			}
+		case "pypi":
+			if strings.Contains(clean, "/simple/") {
+				return "text/html"
+			}
 		}
 	}
 
@@ -372,10 +380,10 @@ func inferCachedContentType(route *server.HubRoute, locator cache.Locator) strin
 func buildLocator(route *server.HubRoute, c fiber.Ctx) cache.Locator {
 	uri := c.Request().URI()
 	pathVal := string(uri.Path())
-	if pathVal == "" {
-		pathVal = "/"
+	clean := normalizeRequestPath(route, pathVal)
+	if newPath, ok := applyPyPISimpleFallback(route, clean); ok {
+		clean = newPath
 	}
-	clean := path.Clean("/" + pathVal)
 	if newPath, ok := applyDockerHubNamespaceFallback(route, clean); ok {
 		clean = newPath
 	}
@@ -412,6 +420,18 @@ func requestPath(c fiber.Ctx) string {
 	return pathVal
 }
 
+func normalizeRequestPath(route *server.HubRoute, raw string) string {
+	if raw == "" {
+		raw = "/"
+	}
+	hasSlash := strings.HasSuffix(raw, "/")
+	clean := path.Clean("/" + raw)
+	if route != nil && route.Config.Type == "pypi" && hasSlash && clean != "/" && !strings.HasSuffix(clean, "/") {
+		clean += "/"
+	}
+	return clean
+}
+
 func bytesReader(b []byte) io.Reader {
 	if len(b) == 0 {
 		return http.NoBody
@@ -422,11 +442,14 @@ func bytesReader(b []byte) io.Reader {
 func resolveUpstreamURL(route *server.HubRoute, base *url.URL, c fiber.Ctx) *url.URL {
 	uri := c.Request().URI()
 	pathVal := string(uri.Path())
-	relative := &url.URL{Path: pathVal, RawPath: pathVal}
-	if newPath, ok := applyDockerHubNamespaceFallback(route, relative.Path); ok {
-		relative.Path = newPath
-		relative.RawPath = newPath
+	clean := normalizeRequestPath(route, pathVal)
+	if newPath, ok := applyPyPISimpleFallback(route, clean); ok {
+		clean = newPath
 	}
+	if newPath, ok := applyDockerHubNamespaceFallback(route, clean); ok {
+		clean = newPath
+	}
+	relative := &url.URL{Path: clean, RawPath: clean}
 	if query := string(uri.QueryString()); query != "" {
 		relative.RawQuery = query
 	}
@@ -472,10 +495,10 @@ func determineCachePolicy(route *server.HubRoute, locator cache.Locator, method 
 	policy := cachePolicy{allowCache: true, allowStore: true}
 	path := stripQueryMarker(locator.Path)
 	switch route.Config.Type {
-	case "docker":
-		if path == "/v2" || path == "v2" || path == "/v2/" {
-			return cachePolicy{}
-		}
+case "docker":
+	if path == "/v2" || path == "v2" || path == "/v2/" {
+		return cachePolicy{}
+	}
 		if strings.Contains(path, "/_catalog") {
 			return cachePolicy{}
 		}
@@ -484,21 +507,27 @@ func determineCachePolicy(route *server.HubRoute, locator cache.Locator, method 
 		}
 		policy.requireRevalidate = true
 		return policy
-	case "go":
-		if strings.Contains(path, "/@v/") && (strings.HasSuffix(path, ".zip") || strings.HasSuffix(path, ".mod") || strings.HasSuffix(path, ".info")) {
-			return policy
-		}
-		policy.requireRevalidate = true
-		return policy
-	case "npm":
-		if strings.Contains(path, "/-/") && strings.HasSuffix(path, ".tgz") {
-			return policy
-		}
-		policy.requireRevalidate = true
-		return policy
-	default:
+case "go":
+	if strings.Contains(path, "/@v/") && (strings.HasSuffix(path, ".zip") || strings.HasSuffix(path, ".mod") || strings.HasSuffix(path, ".info")) {
 		return policy
 	}
+	policy.requireRevalidate = true
+	return policy
+case "npm":
+	if strings.Contains(path, "/-/") && strings.HasSuffix(path, ".tgz") {
+		return policy
+	}
+	policy.requireRevalidate = true
+	return policy
+case "pypi":
+	if isPyPIDistribution(path) {
+		return policy
+	}
+	policy.requireRevalidate = true
+	return policy
+default:
+	return policy
+}
 }
 
 func isDockerImmutablePath(path string) bool {
@@ -509,6 +538,25 @@ func isDockerImmutablePath(path string) bool {
 		return true
 	}
 	return false
+}
+
+func isPyPIDistribution(path string) bool {
+	switch {
+	case strings.HasSuffix(path, ".whl"):
+		return true
+	case strings.HasSuffix(path, ".tar.gz"):
+		return true
+	case strings.HasSuffix(path, ".tar.bz2"):
+		return true
+	case strings.HasSuffix(path, ".tgz"):
+		return true
+	case strings.HasSuffix(path, ".zip"):
+		return true
+	case strings.HasSuffix(path, ".egg"):
+		return true
+	default:
+		return false
+	}
 }
 
 func isCacheableStatus(status int) bool {
@@ -614,6 +662,23 @@ func splitDockerRepoPath(path string) (string, string, bool) {
 		repoSegments = append(repoSegments, seg)
 	}
 	return "", "", false
+}
+
+func applyPyPISimpleFallback(route *server.HubRoute, path string) (string, bool) {
+	if route == nil || route.Config.Type != "pypi" {
+		return path, false
+	}
+	if strings.HasPrefix(path, "/simple/") || strings.HasPrefix(path, "/packages/") {
+		return path, false
+	}
+	if strings.HasSuffix(path, ".whl") || strings.HasSuffix(path, ".tar.gz") || strings.HasSuffix(path, ".tar.bz2") || strings.HasSuffix(path, ".zip") {
+		return path, false
+	}
+	trimmed := strings.Trim(path, "/")
+	if trimmed == "" || strings.HasPrefix(trimmed, "_") {
+		return path, false
+	}
+	return "/simple/" + trimmed + "/", true
 }
 
 type bearerChallenge struct {
@@ -765,6 +830,8 @@ func ensureProxyHubType(route *server.HubRoute) error {
 	case "npm":
 		return nil
 	case "go":
+		return nil
+	case "pypi":
 		return nil
 	default:
 		return fmt.Errorf("unsupported hub type: %s", route.Config.Type)
