@@ -10,4 +10,4 @@ if [[ ! -f "${CONFIG}" ]]; then
 fi
 
 echo "Starting any-hub with ${CONFIG}"
-exec go run ./cmd/any-hub --config "${CONFIG}"
+exec go run . --config "${CONFIG}"

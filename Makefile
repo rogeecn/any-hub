@@ -4,10 +4,10 @@ GOCACHE  ?= /tmp/go-build
 .PHONY: build fmt test test-all run
 
 build:
-	$(GO) build ./cmd/any-hub
+	$(GO) build .
 
 fmt:
-	$(GO)fmt ./cmd ./internal ./tests
+	$(GO) fmt ./...
 
 test:
 	$(GO) test ./...
@@ -16,4 +16,4 @@ test-all:
 	GOCACHE=$(GOCACHE) $(GO) test ./...
 
 run:
-	$(GO) run ./cmd/any-hub --config ./config.toml
+	$(GO) run . --config ./config.toml
