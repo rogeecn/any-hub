@@ -3,8 +3,12 @@ package cache
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -37,6 +41,9 @@ func TestStorePutAndGet(t *testing.T) {
 	}
 	if !result.Entry.ModTime.Equal(modTime) {
 		t.Fatalf("modtime mismatch: expected %v got %v", modTime, result.Entry.ModTime)
+	}
+	if !strings.HasSuffix(result.Entry.FilePath, cacheFileSuffix) {
+		t.Fatalf("expected cache file suffix %s, got %s", cacheFileSuffix, result.Entry.FilePath)
 	}
 }
 
@@ -75,12 +82,88 @@ func TestStoreIgnoresDirectories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("path error: %v", err)
 	}
-	if err := os.MkdirAll(filePath, 0o755); err != nil {
+	if err := os.MkdirAll(filePath+cacheFileSuffix, 0o755); err != nil {
 		t.Fatalf("mkdir error: %v", err)
 	}
 
 	if _, err := store.Get(context.Background(), locator); err == nil || err != ErrNotFound {
 		t.Fatalf("expected ErrNotFound for directory, got %v", err)
+	}
+}
+
+func TestStoreMigratesLegacyEntryOnGet(t *testing.T) {
+	store := newTestStore(t)
+	fs, ok := store.(*fileStore)
+	if !ok {
+		t.Fatalf("unexpected store type %T", store)
+	}
+	locator := Locator{HubName: "npm", Path: "/pkg"}
+	legacyPath, err := fs.path(locator)
+	if err != nil {
+		t.Fatalf("path error: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o755); err != nil {
+		t.Fatalf("mkdir error: %v", err)
+	}
+	if err := os.WriteFile(legacyPath, []byte("legacy"), 0o644); err != nil {
+		t.Fatalf("write legacy error: %v", err)
+	}
+
+	result, err := store.Get(context.Background(), locator)
+	if err != nil {
+		t.Fatalf("get legacy error: %v", err)
+	}
+	body, err := io.ReadAll(result.Reader)
+	if err != nil {
+		t.Fatalf("read legacy error: %v", err)
+	}
+	result.Reader.Close()
+	if string(body) != "legacy" {
+		t.Fatalf("unexpected legacy body: %s", string(body))
+	}
+	if !strings.HasSuffix(result.Entry.FilePath, cacheFileSuffix) {
+		t.Fatalf("expected migrated file suffix, got %s", result.Entry.FilePath)
+	}
+	if _, statErr := os.Stat(legacyPath); !errors.Is(statErr, fs.ErrNotExist) {
+		t.Fatalf("expected legacy path removed, got %v", statErr)
+	}
+}
+
+func TestStoreHandlesAncestorFileConflict(t *testing.T) {
+	store := newTestStore(t)
+	fs, ok := store.(*fileStore)
+	if !ok {
+		t.Fatalf("unexpected store type %T", store)
+	}
+	metaLocator := Locator{HubName: "npm", Path: "/pkg"}
+	legacyPath, err := fs.path(metaLocator)
+	if err != nil {
+		t.Fatalf("path error: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o755); err != nil {
+		t.Fatalf("mkdir error: %v", err)
+	}
+	if err := os.WriteFile(legacyPath, []byte("legacy"), 0o644); err != nil {
+		t.Fatalf("write legacy error: %v", err)
+	}
+
+	tarLocator := Locator{HubName: "npm", Path: "/pkg/-/pkg-1.0.0.tgz"}
+	if _, err := store.Put(context.Background(), tarLocator, bytes.NewReader([]byte("tar")), PutOptions{}); err != nil {
+		t.Fatalf("put tar error: %v", err)
+	}
+
+	if _, err := os.Stat(legacyPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("expected legacy metadata renamed, got %v", err)
+	}
+	if _, err := os.Stat(legacyPath + cacheFileSuffix); err != nil {
+		t.Fatalf("expected migrated legacy cache, got %v", err)
+	}
+	primary, _, err := fs.entryPaths(tarLocator)
+	if err != nil {
+		t.Fatalf("entry path error: %v", err)
+	}
+	if _, err := os.Stat(primary); err != nil {
+		t.Fatalf("expected tar cache file, got %v", err)
 	}
 }
 
