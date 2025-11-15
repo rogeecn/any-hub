@@ -1,25 +1,30 @@
 package hubmodule
 
-import "strings"
+import (
+	"path"
+	"strings"
+)
 
-// DefaultLocatorRewrite 针对内置 hub 类型提供缓存路径重写逻辑。
+// DefaultLocatorRewrite 根据 Hub 类型返回通用的路径重写逻辑。
 func DefaultLocatorRewrite(hubType string) LocatorRewrite {
-	 switch hubType {
-	 case "npm":
+	switch hubType {
+	case "npm":
 		return rewriteNPMLocator
-	 default:
+	case "go":
+		return rewriteGoLocator
+	default:
 		return nil
-	 }
+	}
 }
 
 func rewriteNPMLocator(loc Locator) Locator {
-	path := loc.Path
-	if path == "" {
+	pathVal := loc.Path
+	if pathVal == "" {
 		return loc
 	}
 
 	var qsSuffix string
-	core := path
+	core := pathVal
 	if idx := strings.Index(core, "/__qs/"); idx >= 0 {
 		qsSuffix = core[idx:]
 		core = core[:idx]
@@ -41,5 +46,25 @@ func rewriteNPMLocator(loc Locator) Locator {
 	}
 
 	loc.Path = clean + "/package.json" + qsSuffix
+	return loc
+}
+
+func rewriteGoLocator(loc Locator) Locator {
+	if loc.Path == "" {
+		loc.Path = "/"
+		return loc
+	}
+	clean := path.Clean("/" + loc.Path)
+	if strings.HasPrefix(clean, "/sumdb/") {
+		loc.Path = clean
+		return loc
+	}
+	if strings.HasSuffix(clean, "/") {
+		clean = strings.TrimSuffix(clean, "/")
+		if clean == "" {
+			clean = "/"
+		}
+	}
+	loc.Path = clean
 	return loc
 }
