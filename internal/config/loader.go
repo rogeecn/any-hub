@@ -94,6 +94,9 @@ func applyHubDefaults(h *HubConfig) {
 	} else {
 		h.Module = strings.ToLower(trimmed)
 	}
+	if rollout := strings.TrimSpace(h.Rollout); rollout != "" {
+		h.Rollout = strings.ToLower(rollout)
+	}
 	if h.ValidationMode == "" {
 		h.ValidationMode = string(hubmodule.ValidationModeETag)
 	}

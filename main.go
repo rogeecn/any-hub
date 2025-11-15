@@ -14,6 +14,7 @@ import (
 	"github.com/any-hub/any-hub/internal/logging"
 	"github.com/any-hub/any-hub/internal/proxy"
 	"github.com/any-hub/any-hub/internal/server"
+	"github.com/any-hub/any-hub/internal/server/routes"
 	"github.com/any-hub/any-hub/internal/version"
 )
 
@@ -144,6 +145,7 @@ func startHTTPServer(cfg *config.Config, registry *server.HubRegistry, proxyHand
 	if err != nil {
 		return err
 	}
+	routes.RegisterModuleRoutes(app, registry)
 
 	logger.WithFields(logrus.Fields{
 		"action": "listen",

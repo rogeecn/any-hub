@@ -1,8 +1,7 @@
+// Package template 提供编写新模块时可复制的骨架示例。
 package template
 
 import "github.com/any-hub/any-hub/internal/hubmodule"
-
-// Package template 提供编写新模块时可复制的骨架示例。
 //
 // 使用方式：复制整个目录到 internal/hubmodule/<module-key>/ 并替换字段。
 // - 将 TemplateModule 重命名为实际模块类型。

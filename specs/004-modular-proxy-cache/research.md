@@ -20,9 +20,9 @@
 - **Alternatives considered**: Allow modules to spin up custom Fiber groups or loggers—rejected because it complicates shutdown hooks and breaks structured logging consistency.
 
 ## Decision 4: Storage Layout Compatibility
-- **Decision**: Keep current `StoragePath/<Hub>/<path>.body` layout; modules may add subdirectories below `<path>` only when necessary but must expose migration hooks via registry metadata.
-- **Rationale**: Recent cache fix established `.body` suffix to avoid file/dir conflicts; modules should reuse it to maintain operational tooling compatibility.
-- **Alternatives considered**: Give each module a distinct root folder—rejected because it would fragment cleanup tooling and require per-module disk quotas.
+- **Decision**: Reuse the original request path directly (`StoragePath/<Hub>/<path>`) so operators can browse cached artifacts without suffix translation; modules share the same layout and rely on directory creation safeguards to avoid traversal issues.
+- **Rationale**: Aligns with operational workflows that expect “what you request is what you store,” simplifying manual cache invalidation and disk audits now that we no longer need `.body` indirection.
+- **Alternatives considered**: Keep the `.body` suffix or add per-module subdirectories—rejected because suffix-based migrations complicate tooling and dedicated subdirectories fragment cache quotas.
 
 ## Decision 5: Testing Strategy
 - **Decision**: For each module, enforce a shared test harness that spins a fake upstream using `httptest.Server`, writes to `t.TempDir()` storage, and asserts registry wiring end-to-end via integration tests.

@@ -84,6 +84,11 @@ func (c *Config) Validate() error {
 			return newFieldError(hubField(hub.Name, "Module"), fmt.Sprintf("未注册模块: %s", moduleKey))
 		}
 		hub.Module = moduleKey
+		flag, err := parseRolloutFlag(hub.Rollout, hub.Module)
+		if err != nil {
+			return newFieldError(hubField(hub.Name, "Rollout"), err.Error())
+		}
+		hub.Rollout = string(flag)
 		if hub.ValidationMode != "" {
 			mode := strings.ToLower(strings.TrimSpace(hub.ValidationMode))
 			switch mode {

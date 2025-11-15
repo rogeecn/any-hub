@@ -2,7 +2,7 @@
 
 ## Overview
 
-The modular architecture introduces explicit metadata describing which proxy+cache module each hub uses, how modules register themselves, and what cache policies they expose. The underlying storage layout (`StoragePath/<Hub>/<path>.body`) remains unchanged, but new metadata ensures the runtime can resolve modules, enforce compatibility, and migrate legacy hubs incrementally.
+The modular architecture introduces explicit metadata describing which proxy+cache module each hub uses, how modules register themselves, and what cache policies they expose. The underlying storage layout now matches the upstream request path (`StoragePath/<Hub>/<path>`), simplifying disk management while metadata ensures the runtime can resolve modules, enforce compatibility, and migrate legacy hubs incrementally.
 
 ## Entities
 
@@ -48,7 +48,7 @@ The modular architecture introduces explicit metadata describing which proxy+cac
 - **Fields**:
   - `TTL` *(duration)* – default TTL per module; hubs may override via config.
   - `ValidationMode` *(enum: `etag`, `last-modified`, `never`)* – defines revalidation behavior.
-  - `DiskLayout` *(string)* – description of path mapping rules (default `.body` suffix).
+  - `DiskLayout` *(string)* – description of path mapping rules (default `raw_path`, i.e., exact upstream path without suffix).
   - `RequiresMetadataFile` *(bool)* – whether `.meta` entries are required.
   - `SupportsStreamingWrite` *(bool)* – indicates module can write cache while proxying upstream.
 - **Relationships**:
@@ -92,4 +92,3 @@ The modular architecture introduces explicit metadata describing which proxy+cac
 
 - `HubConfigEntry.Name` and `ModuleMetadata.Key` must each be unique (case-insensitive) within a config/process.
 - Module registry rejects duplicate keys to avoid ambiguous bindings.
-

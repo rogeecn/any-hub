@@ -96,10 +96,12 @@ func mustNewApp(t *testing.T, port int, logger *logrus.Logger, registry *server.
 type moduleRecorder struct {
     routeName string
     moduleKey string
+    rollout   string
 }
 
 func (p *moduleRecorder) Handle(c fiber.Ctx, route *server.HubRoute) error {
     p.routeName = route.Config.Name
     p.moduleKey = route.ModuleKey
+    p.rollout = string(route.RolloutFlag)
     return c.SendStatus(fiber.StatusNoContent)
 }

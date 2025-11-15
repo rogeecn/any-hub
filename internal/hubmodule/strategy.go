@@ -17,5 +17,18 @@ func ResolveStrategy(meta ModuleMetadata, opts StrategyOptions) CacheStrategyPro
 	if opts.ValidationOverride != "" {
 		strategy.ValidationMode = opts.ValidationOverride
 	}
-	return strategy
+	return normalizeStrategy(strategy)
+}
+
+func normalizeStrategy(profile CacheStrategyProfile) CacheStrategyProfile {
+	if profile.TTLHint < 0 {
+		profile.TTLHint = 0
+	}
+	if profile.ValidationMode == "" {
+		profile.ValidationMode = ValidationModeETag
+	}
+	if profile.DiskLayout == "" {
+		profile.DiskLayout = "raw_path"
+	}
+	return profile
 }

@@ -3,6 +3,8 @@
 .github
 .codex
 .specify
+Dockerfile*
+.dockerignore
 configs
 node_modules/
 coverage/

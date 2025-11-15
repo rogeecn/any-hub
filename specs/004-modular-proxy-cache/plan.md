@@ -13,7 +13,7 @@ Modularize the proxy and cache layers so every hub type (npm, Docker, PyPI, futu
 
 **Language/Version**: Go 1.25+ (静态链接，单二进制交付)  
 **Primary Dependencies**: Fiber v3（HTTP 服务）、Viper（配置）、Logrus + Lumberjack（结构化日志 & 滚动）、标准库 `net/http`/`io`  
-**Storage**: 本地文件系统缓存目录 `StoragePath/<Hub>/<path>.body` + `.meta` 元数据（模块必须复用同一布局）  
+**Storage**: 本地文件系统缓存目录 `StoragePath/<Hub>/<path>`，直接复用请求路径完成磁盘定位  
 **Testing**: `go test ./...`，使用 `httptest`、临时目录和自建上游伪服务验证配置/缓存/代理路径  
 **Target Platform**: Linux/Unix CLI 进程，由 systemd/supervisor 管理，匿名下游客户端  
 **Project Type**: 单 Go 项目（`cmd/` 入口 + `internal/*` 包）  
@@ -104,7 +104,7 @@ tests/                     # `go test` 下的单元/集成测试，用临时目�
 - New diagnostics endpoint remains internal and optional; no UI/login introduced. ✅ Principle I
 - Code still single Go binary with existing dependency set. ✅ Principle II
 - `Module` field documented with defaults, validation, and migration path; no extra config sources. ✅ Principle III
-- Cache strategy enforces `.body` layout and streaming flow, with telemetry requirements captured in contracts. ✅ Principle IV
+- Cache strategy enforces“原始路径 == 磁盘路径”的布局与流式回源，相关观测需求写入 contracts。✅ Principle IV
 - Logs/quickstart/test guidance ensure observability and Chinese documentation continue. ✅ Principle V
 
 ## Phase 2 – Implementation Outlook (pre-tasks)
@@ -112,6 +112,6 @@ tests/                     # `go test` 下的单元/集成测试，用临时目�
 1. **Module Registry & Interfaces**: Create `internal/hubmodule` package, define shared interfaces, implement registry with tests, and expose diagnostics data source reused by HTTP endpoints.
 2. **Config Loader & Validation**: Extend `internal/config/types.go` and `validation.go` to include `Module` with default `legacy`, plus wiring to registry resolution during startup.
 3. **Legacy Adapter & Migration Switches**: Provide adapter module that wraps current shared proxy/cache, plus feature flags or config toggles to control rollout states per hub.
-4. **Module Implementations**: Carve existing npm/docker/pypi logic into dedicated modules within `internal/hubmodule/`, ensuring cache writer uses `.body` layout and telemetry tags.
+4. **Module Implementations**: Carve existing npm/docker/pypi logic into dedicated modules within `internal/hubmodule/`, ensuring cache writer复用原始请求路径与必要的 telemetry 标签。
 5. **Observability/Diagnostics**: Implement `/−/modules` endpoint (Fiber route) and log tags showing `module_key` on cache/proxy events.
 6. **Testing**: Add shared test harness for modules, update integration tests to cover mixed legacy + modular hubs, and document commands in README/quickstart.

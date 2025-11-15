@@ -9,7 +9,7 @@ import (
 
 // Store 负责管理磁盘缓存的读写。磁盘布局遵循：
 //
-//	<StoragePath>/<HubName>/<path>.body    # 实际正文
+//	<StoragePath>/<HubName>/<path>    # 实际正文（与请求路径一致）
 //
 // 每个条目仅由正文文件组成，文件的 ModTime/Size 由文件系统提供。
 type Store interface {

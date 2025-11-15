@@ -79,6 +79,10 @@ func requestContextMiddleware(opts AppOptions) fiber.Handler {
 		c.Locals(contextKeyRequestID, reqID)
 		c.Set("X-Request-ID", reqID)
 
+		if isDiagnosticsPath(string(c.Request().URI().Path())) {
+			return c.Next()
+		}
+
 		rawHost := strings.TrimSpace(getHostHeader(c))
 		route, ok := opts.Registry.Lookup(rawHost)
 		if !ok {
@@ -153,13 +157,19 @@ func ensureRouterHubType(route *HubRoute) error {
 
 func renderTypeUnsupported(c fiber.Ctx, logger *logrus.Logger, route *HubRoute, err error) error {
 	fields := logrus.Fields{
-		"action":   "hub_type_check",
-		"hub":      route.Config.Name,
-		"hub_type": route.Config.Type,
-		"error":    "hub_type_unsupported",
+		"action":       "hub_type_check",
+		"hub":          route.Config.Name,
+		"hub_type":     route.Config.Type,
+		"module_key":   route.ModuleKey,
+		"rollout_flag": string(route.RolloutFlag),
+		"error":        "hub_type_unsupported",
 	}
 	logger.WithFields(fields).Error(err.Error())
 	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
 		"error": "hub_type_unsupported",
 	})
+}
+
+func isDiagnosticsPath(path string) bool {
+	return strings.HasPrefix(path, "/-/")
 }

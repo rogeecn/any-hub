@@ -15,7 +15,7 @@ internal/hubmodule/
 ## 模块约束
 - **单一接口**：每个模块需要同时实现代理与缓存接口，避免跨包耦合。
 - **注册流程**：在模块 `init()` 中调用 `hubmodule.Register(ModuleMetadata{...})`，注册失败必须 panic 以阻止启动。
-- **缓存布局**：一律使用 `StoragePath/<Hub>/<path>.body`，如需附加目录需在 `ModuleMetadata` 中声明迁移策略。
+- **缓存布局**：一律使用 `StoragePath/<Hub>/<path>`，即与上游请求完全一致的磁盘路径；当某个路径既要保存正文又要作为子目录父节点时，会在该目录下写入 `__content` 文件以存放正文。
 - **配置注入**：模块仅通过依赖注入获取 `HubConfigEntry` 和全局参数，禁止直接读取文件或环境变量。
 - **可观测性**：所有模块必须输出 `module_key`、命中/回源状态等日志字段，并在返回错误时附带 Hub 名称。
 

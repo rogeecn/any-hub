@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/any-hub/any-hub/internal/hubmodule"
 )
 
 // Duration 提供更灵活的反序列化能力，同时兼容纯秒整数与 Go Duration 字符串。
@@ -68,6 +70,7 @@ type HubConfig struct {
 	Proxy           string   `mapstructure:"Proxy"`
 	Type            string   `mapstructure:"Type"`
 	Module          string   `mapstructure:"Module"`
+	Rollout         string   `mapstructure:"Rollout"`
 	Username        string   `mapstructure:"Username"`
 	Password        string   `mapstructure:"Password"`
 	CacheTTL        Duration `mapstructure:"CacheTTL"`
@@ -104,4 +107,15 @@ func CredentialModes(hubs []HubConfig) []string {
 		result[i] = fmt.Sprintf("%s:%s", hub.Name, hub.AuthMode())
 	}
 	return result
+}
+
+// StrategyOverrides 将 hub 层的 TTL/Validation 配置映射为模块策略覆盖项。
+func (h HubConfig) StrategyOverrides(ttl time.Duration) hubmodule.StrategyOptions {
+	opts := hubmodule.StrategyOptions{
+		TTLOverride: ttl,
+	}
+	if mode := strings.TrimSpace(h.ValidationMode); mode != "" {
+		opts.ValidationOverride = hubmodule.ValidationMode(mode)
+	}
+	return opts
 }

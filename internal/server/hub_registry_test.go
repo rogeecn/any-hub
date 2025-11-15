@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/any-hub/any-hub/internal/config"
+	"github.com/any-hub/any-hub/internal/hubmodule/legacy"
 )
 
 func TestHubRegistryLookupByHost(t *testing.T) {
@@ -47,6 +48,15 @@ func TestHubRegistryLookupByHost(t *testing.T) {
 
 	if route.CacheTTL != cfg.EffectiveCacheTTL(route.Config) {
 		t.Errorf("cache ttl mismatch: got %s", route.CacheTTL)
+	}
+	if route.CacheStrategy.TTLHint != route.CacheTTL {
+		t.Errorf("cache strategy ttl mismatch: %s vs %s", route.CacheStrategy.TTLHint, route.CacheTTL)
+	}
+	if route.CacheStrategy.ValidationMode == "" {
+		t.Fatalf("cache strategy validation mode should not be empty")
+	}
+	if route.RolloutFlag != legacy.RolloutLegacyOnly {
+		t.Fatalf("default rollout flag should be legacy-only")
 	}
 
 	if route.UpstreamURL.String() != "https://registry-1.docker.io" {

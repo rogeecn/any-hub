@@ -48,14 +48,14 @@
 
 ### Tests
 
-- [ ] T012 [P] [US2] Add cache strategy override integration test validating TTL + revalidation paths in `tests/integration/cache_strategy_override_test.go`
-- [ ] T013 [P] [US2] Add module-level cache strategy unit tests in `internal/hubmodule/npm/module_test.go`
+- [X] T012 [P] [US2] Add cache strategy override integration test validating TTL + revalidation paths in `tests/integration/cache_strategy_override_test.go`
+- [X] T013 [P] [US2] Add module-level cache strategy unit tests in `internal/hubmodule/npm/module_test.go`
 
 ### Implementation
 
-- [ ] T014 [US2] Implement `CacheStrategyProfile` helpers and injection plumbing (`internal/hubmodule/strategy.go`, `internal/cache/writer.go`)
-- [ ] T015 [US2] Bind hub-level overrides to strategy metadata via config/runtime structures (`internal/config/types.go`, `internal/config/runtime.go`)
-- [ ] T016 [US2] Update existing modules (npm/docker/pypi) to declare strategies + honor overrides (`internal/hubmodule/{npm,docker,pypi}/module.go`)
+- [X] T014 [US2] Implement `CacheStrategyProfile` helpers and injection plumbing (`internal/hubmodule/strategy.go`, `internal/cache/writer.go`)
+- [X] T015 [US2] Bind hub-level overrides to strategy metadata via config/runtime structures (`internal/config/types.go`, `internal/config/runtime.go`)
+- [X] T016 [US2] Update existing modules (npm/docker/pypi) to declare strategies + honor overrides (`internal/hubmodule/{npm,docker,pypi}/module.go`)
 
 ---
 
@@ -66,22 +66,22 @@
 
 ### Tests
 
-- [ ] T017 [P] [US3] Add dual-mode integration test covering rollout toggle + rollback in `tests/integration/legacy_adapter_toggle_test.go`
-- [ ] T018 [P] [US3] Add diagnostics endpoint contract test for `/−/modules` in `tests/integration/module_diagnostics_test.go`
+- [X] T017 [P] [US3] Add dual-mode integration test covering rollout toggle + rollback in `tests/integration/legacy_adapter_toggle_test.go`
+- [X] T018 [P] [US3] Add diagnostics endpoint contract test for `/−/modules` in `tests/integration/module_diagnostics_test.go`
 
 ### Implementation
 
-- [ ] T019 [US3] Implement `LegacyAdapterState` tracker + rollout flag parsing (`internal/hubmodule/legacy/state.go`, `internal/config/runtime_flags.go`)
-- [ ] T020 [US3] Implement Fiber handler + routing for `/−/modules` diagnostics (`internal/server/routes/modules.go`, `internal/server/router.go`)
-- [ ] T021 [US3] Add structured log fields (`module_key`, `rollout_flag`) across logging middleware (`internal/server/middleware/logging.go`, `internal/proxy/logging.go`)
-- [ ] T022 [US3] Document operational playbook for phased migration (`docs/operations/migration.md`)
+- [X] T019 [US3] Implement `LegacyAdapterState` tracker + rollout flag parsing (`internal/hubmodule/legacy/state.go`, `internal/config/runtime_flags.go`)
+- [X] T020 [US3] Implement Fiber handler + routing for `/−/modules` diagnostics (`internal/server/routes/modules.go`, `internal/server/router.go`)
+- [X] T021 [US3] Add structured log fields (`module_key`, `rollout_flag`) across logging middleware (`internal/server/middleware/logging.go`, `internal/proxy/logging.go`)
+- [X] T022 [US3] Document operational playbook for phased migration (`docs/operations/migration.md`)
 
 ---
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T023 [P] Add Chinese comments + GoDoc for new interfaces/modules (`internal/hubmodule/**/*.go`)
-- [ ] T024 Validate quickstart by running module creation flow end-to-end and capture sample logs (`specs/004-modular-proxy-cache/quickstart.md`, `logs/`)
+- [X] T023 [P] Add Chinese comments + GoDoc for new interfaces/modules (`internal/hubmodule/**/*.go`)
+- [X] T024 Validate quickstart by running module creation flow end-to-end and capture sample logs (`specs/004-modular-proxy-cache/quickstart.md`, `logs/`)
 
 ---
 

@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-const cacheFileSuffix = ".body"
-
 // NewStore 以 basePath 为根目录构建磁盘缓存，整站复用一份实例。
 func NewStore(basePath string) (Store, error) {
 	if basePath == "" {
@@ -58,13 +56,27 @@ func (s *fileStore) Get(ctx context.Context, locator Locator) (*ReadResult, erro
 	default:
 	}
 
-	primary, legacy, err := s.entryPaths(locator)
+	filePath, err := s.entryPath(locator)
 	if err != nil {
 		return nil, err
 	}
 
-	filePath, info, f, err := s.openEntryFile(primary, legacy)
+	info, err := os.Stat(filePath)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) || isNotDirError(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	if info.IsDir() {
+		return nil, ErrNotFound
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) || isNotDirError(err) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 
@@ -74,11 +86,7 @@ func (s *fileStore) Get(ctx context.Context, locator Locator) (*ReadResult, erro
 		SizeBytes: info.Size(),
 		ModTime:   info.ModTime(),
 	}
-
-	return &ReadResult{
-		Entry:  entry,
-		Reader: f,
-	}, nil
+	return &ReadResult{Entry: entry, Reader: file}, nil
 }
 
 func (s *fileStore) Put(ctx context.Context, locator Locator, body io.Reader, opts PutOptions) (*Entry, error) {
@@ -88,12 +96,12 @@ func (s *fileStore) Put(ctx context.Context, locator Locator, body io.Reader, op
 	}
 	defer unlock()
 
-	filePath, legacyPath, err := s.entryPaths(locator)
+	filePath, err := s.entryPath(locator)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.ensureDirWithUpgrade(filepath.Dir(filePath)); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
 		return nil, err
 	}
 
@@ -109,12 +117,12 @@ func (s *fileStore) Put(ctx context.Context, locator Locator, body io.Reader, op
 		err = closeErr
 	}
 	if err != nil {
-		os.Remove(tempName)
+		_ = os.Remove(tempName)
 		return nil, err
 	}
 
 	if err := os.Rename(tempName, filePath); err != nil {
-		os.Remove(tempName)
+		_ = os.Remove(tempName)
 		return nil, err
 	}
 
@@ -125,7 +133,6 @@ func (s *fileStore) Put(ctx context.Context, locator Locator, body io.Reader, op
 	if err := os.Chtimes(filePath, modTime, modTime); err != nil {
 		return nil, err
 	}
-	_ = os.Remove(legacyPath)
 
 	entry := Entry{
 		Locator:   locator,
@@ -143,14 +150,11 @@ func (s *fileStore) Remove(ctx context.Context, locator Locator) error {
 	}
 	defer unlock()
 
-	filePath, legacyPath, err := s.entryPaths(locator)
+	filePath, err := s.entryPath(locator)
 	if err != nil {
 		return err
 	}
 	if err := os.Remove(filePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	if err := os.Remove(legacyPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 	return nil
@@ -179,7 +183,7 @@ func (s *fileStore) lockEntry(locator Locator) (func(), error) {
 	}, nil
 }
 
-func (s *fileStore) path(locator Locator) (string, error) {
+func (s *fileStore) entryPath(locator Locator) (string, error) {
 	if locator.HubName == "" {
 		return "", errors.New("hub name required")
 	}
@@ -201,121 +205,6 @@ func (s *fileStore) path(locator Locator) (string, error) {
 		return "", errors.New("invalid cache path")
 	}
 	return filePath, nil
-}
-
-func (s *fileStore) entryPaths(locator Locator) (string, string, error) {
-	legacyPath, err := s.path(locator)
-	if err != nil {
-		return "", "", err
-	}
-	return legacyPath + cacheFileSuffix, legacyPath, nil
-}
-
-func (s *fileStore) openEntryFile(primaryPath, legacyPath string) (string, fs.FileInfo, *os.File, error) {
-	info, err := os.Stat(primaryPath)
-	if err == nil {
-		if info.IsDir() {
-			return "", nil, nil, ErrNotFound
-		}
-		f, err := os.Open(primaryPath)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) || isNotDirError(err) {
-				return "", nil, nil, ErrNotFound
-			}
-			return "", nil, nil, err
-		}
-		return primaryPath, info, f, nil
-	}
-	if !errors.Is(err, fs.ErrNotExist) && !isNotDirError(err) {
-		return "", nil, nil, err
-	}
-
-	info, err = os.Stat(legacyPath)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) || isNotDirError(err) {
-			return "", nil, nil, ErrNotFound
-		}
-		return "", nil, nil, err
-	}
-	if info.IsDir() {
-		return "", nil, nil, ErrNotFound
-	}
-
-	if migrateErr := s.migrateLegacyFile(primaryPath, legacyPath); migrateErr == nil {
-		return s.openEntryFile(primaryPath, legacyPath)
-	}
-
-	f, err := os.Open(legacyPath)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) || isNotDirError(err) {
-			return "", nil, nil, ErrNotFound
-		}
-		return "", nil, nil, err
-	}
-	return legacyPath, info, f, nil
-}
-
-func (s *fileStore) migrateLegacyFile(primaryPath, legacyPath string) error {
-	if legacyPath == "" || primaryPath == legacyPath {
-		return nil
-	}
-	if _, err := os.Stat(legacyPath); err != nil {
-		return err
-	}
-	if _, err := os.Stat(primaryPath); err == nil {
-		if removeErr := os.Remove(legacyPath); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
-			return removeErr
-		}
-		return nil
-	}
-	return os.Rename(legacyPath, primaryPath)
-}
-
-func (s *fileStore) ensureDirWithUpgrade(dir string) error {
-	for i := 0; i < 8; i++ {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			if isNotDirError(err) {
-				var pathErr *os.PathError
-				if errors.As(err, &pathErr) {
-					if upgradeErr := s.upgradeLegacyNode(pathErr.Path); upgradeErr != nil {
-						return upgradeErr
-					}
-					continue
-				}
-			}
-			return err
-		}
-		return nil
-	}
-	return fmt.Errorf("ensure cache directory failed for %s", dir)
-}
-
-func (s *fileStore) upgradeLegacyNode(conflictPath string) error {
-	if conflictPath == "" {
-		return errors.New("empty conflict path")
-	}
-	rel, err := filepath.Rel(s.basePath, conflictPath)
-	if err != nil {
-		return err
-	}
-	if strings.HasPrefix(rel, "..") {
-		return fmt.Errorf("conflict path outside storage: %s", conflictPath)
-	}
-	info, err := os.Stat(conflictPath)
-	if err != nil {
-		return err
-	}
-	if info.IsDir() {
-		return nil
-	}
-	if strings.HasSuffix(conflictPath, cacheFileSuffix) {
-		return nil
-	}
-	newPath := conflictPath + cacheFileSuffix
-	if _, err := os.Stat(newPath); err == nil {
-		return os.Remove(conflictPath)
-	}
-	return os.Rename(conflictPath, newPath)
 }
 
 func isNotDirError(err error) bool {

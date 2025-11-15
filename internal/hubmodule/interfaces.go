@@ -1,6 +1,10 @@
 package hubmodule
 
-import "time"
+import (
+	"time"
+
+	"github.com/any-hub/any-hub/internal/cache"
+)
 
 // MigrationState 描述模块上线阶段，方便观测端区分 legacy/beta/ga。
 type MigrationState string
@@ -36,9 +40,13 @@ type ModuleMetadata struct {
 	MigrationState     MigrationState
 	SupportedProtocols []string
 	CacheStrategy      CacheStrategyProfile
+	LocatorRewrite     LocatorRewrite
 }
 
 // DefaultModuleKey 返回内置 legacy 模块的键值。
 func DefaultModuleKey() string {
 	return defaultModuleKey
 }
+
+// LocatorRewrite 允许模块根据自身协议调整缓存路径，例如将 npm metadata 写入独立文件。
+type LocatorRewrite func(cache.Locator) cache.Locator
