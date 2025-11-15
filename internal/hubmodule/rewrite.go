@@ -1,14 +1,18 @@
-package npm
+package hubmodule
 
-import (
-	"strings"
+import "strings"
 
-	"github.com/any-hub/any-hub/internal/cache"
-)
+// DefaultLocatorRewrite 针对内置 hub 类型提供缓存路径重写逻辑。
+func DefaultLocatorRewrite(hubType string) LocatorRewrite {
+	 switch hubType {
+	 case "npm":
+		return rewriteNPMLocator
+	 default:
+		return nil
+	 }
+}
 
-// rewriteLocator 将 npm metadata JSON 落盘至 package.json，避免与 tarball
-// 路径的 `/-/` 子目录冲突，同时保持 tarball 使用原始路径。
-func rewriteLocator(loc cache.Locator) cache.Locator {
+func rewriteNPMLocator(loc Locator) Locator {
 	path := loc.Path
 	if path == "" {
 		return loc

@@ -25,6 +25,6 @@ func init() {
 			RequiresMetadataFile:   false,
 			SupportsStreamingWrite: true,
 		},
-		LocatorRewrite: rewriteLocator,
+		LocatorRewrite: hubmodule.DefaultLocatorRewrite("npm"),
 	})
 }

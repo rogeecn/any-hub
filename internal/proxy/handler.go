@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/any-hub/any-hub/internal/cache"
+	"github.com/any-hub/any-hub/internal/hubmodule"
 	"github.com/any-hub/any-hub/internal/logging"
 	"github.com/any-hub/any-hub/internal/server"
 )
@@ -289,6 +290,7 @@ func (h *Handler) buildUpstreamRequest(c fiber.Ctx, upstream *url.URL, route *se
 
 	requestHeaders := fiberHeadersAsHTTP(c)
 	server.CopyHeaders(req.Header, requestHeaders)
+	req.Header.Del("Accept-Encoding")
 	req.Host = upstream.Host
 	req.Header.Set("Host", upstream.Host)
 	req.Header.Set("X-Forwarded-Host", c.Hostname())
@@ -410,8 +412,20 @@ func buildLocator(route *server.HubRoute, c fiber.Ctx) cache.Locator {
 		HubName: route.Config.Name,
 		Path:    clean,
 	}
-	if route.Module.LocatorRewrite != nil {
-		loc = route.Module.LocatorRewrite(loc)
+	rewrite := route.Module.LocatorRewrite
+	if rewrite == nil {
+		rewrite = hubmodule.DefaultLocatorRewrite(route.Config.Type)
+	}
+	if rewrite != nil {
+		rewritten := rewrite(hubmodule.Locator{
+			HubName: loc.HubName,
+			Path:    loc.Path,
+			HubType: route.Config.Type,
+		})
+		loc = cache.Locator{
+			HubName: rewritten.HubName,
+			Path:    rewritten.Path,
+		}
 	}
 	return loc
 }
