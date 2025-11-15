@@ -20,7 +20,7 @@
 ## 4. Run and Verify
 1. Start the binary: `go run ./cmd/any-hub --config ./config.toml`.
 2. Use `curl -H "Host: <hub-domain>" http://127.0.0.1:<port>/<path>` to produce traffic, then hit `curl http://127.0.0.1:<port>/-/modules` and confirm the hub binding points to your module with the expected `rollout_flag`.
-3. Inspect `./storage/<hub>/` to confirm the cached files mirror the upstream path (no suffix). When a path also has child entries (e.g., `/pkg` metadata plus `/pkg/-/...` tarballs), the metadata payload is stored in a `__content` file under that directory so both artifacts can coexist. Verify TTL overrides are propagated.
+3. Inspect `./storage/<hub>/` to confirm the cached files mirror the upstream path (no suffix). When a path also has child entries (e.g., `/pkg` metadata plus `/pkg/-/...` tarballs), the metadata payload is stored in a `__content` file under that directory so both artifacts can coexist. PyPI Simple responses rewrite distribution links to `/files/<scheme>/<host>/<path>` so that wheels/tarballs are fetched through the proxy and cached alongside the HTML/JSON index. Verify TTL overrides are propagated.
 4. Monitor `logs/any-hub.log` (or the sample `logs/module_migration_sample.log`) to verify each entry exposes `module_key` + `rollout_flag`. Example:
    ```json
    {"action":"proxy","hub":"testhub","module_key":"testhub","rollout_flag":"dual","cache_hit":false,"upstream_status":200}

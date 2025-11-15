@@ -2,10 +2,13 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -83,7 +86,11 @@ func TestPyPICachePolicies(t *testing.T) {
 	if resp.Header.Get("X-Any-Hub-Cache-Hit") != "false" {
 		t.Fatalf("expected miss for first simple request")
 	}
+	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
+	if !strings.Contains(string(body), "/files/") {
+		t.Fatalf("simple response should rewrite file links, got %s", string(body))
+	}
 
 	resp2 := doRequest(simplePath)
 	if resp2.Header.Get("X-Any-Hub-Cache-Hit") != "true" {
@@ -109,7 +116,12 @@ func TestPyPICachePolicies(t *testing.T) {
 		t.Fatalf("expected second HEAD before refresh, got %d", stub.simpleHeadHits)
 	}
 
-	wheelPath := "/packages/foo/foo-1.0-py3-none-any.whl"
+	wheelURL := fmt.Sprintf("%s/packages/foo/foo-1.0-py3-none-any.whl", stub.URL)
+	parsedWheel, err := url.Parse(wheelURL)
+	if err != nil {
+		t.Fatalf("wheel url parse: %v", err)
+	}
+	wheelPath := fmt.Sprintf("/files/%s/%s%s", parsedWheel.Scheme, parsedWheel.Host, parsedWheel.Path)
 	respWheel := doRequest(wheelPath)
 	if respWheel.StatusCode != fiber.StatusOK {
 		t.Fatalf("expected 200 for wheel, got %d", respWheel.StatusCode)
@@ -151,19 +163,20 @@ type pypiStub struct {
 	simpleBody     []byte
 	wheelBody      []byte
 	lastSimpleMod  string
+	wheelPath      string
 }
 
 func newPyPIStub(t *testing.T) *pypiStub {
 	t.Helper()
 	stub := &pypiStub{
-		simpleBody:    []byte("<html>ok</html>"),
+		wheelPath:     "/packages/foo/foo-1.0-py3-none-any.whl",
 		wheelBody:     []byte("wheel-bytes"),
 		lastSimpleMod: time.Now().UTC().Format(http.TimeFormat),
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/simple/pkg/", stub.handleSimple)
-	mux.HandleFunc("/packages/foo/foo-1.0-py3-none-any.whl", stub.handleWheel)
+	mux.HandleFunc(stub.wheelPath, stub.handleWheel)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -174,6 +187,7 @@ func newPyPIStub(t *testing.T) *pypiStub {
 	stub.server = server
 	stub.listener = listener
 	stub.URL = "http://" + listener.Addr().String()
+	stub.simpleBody = stub.defaultSimpleHTML()
 
 	go func() {
 		_ = server.Serve(listener)
@@ -224,9 +238,13 @@ func (s *pypiStub) handleWheel(w http.ResponseWriter, r *http.Request) {
 
 func (s *pypiStub) UpdateSimple(body []byte) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.simpleBody = append([]byte(nil), body...)
 	s.lastSimpleMod = time.Now().UTC().Format(http.TimeFormat)
+	s.mu.Unlock()
+}
+
+func (s *pypiStub) defaultSimpleHTML() []byte {
+	return []byte(fmt.Sprintf(`<html><body><a href="%s%s">wheel</a></body></html>`, s.URL, s.wheelPath))
 }
 
 func (s *pypiStub) Close() {
