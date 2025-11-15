@@ -3,9 +3,7 @@ package cache
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
-	"io/fs"
 	"os"
 	"testing"
 	"time"
