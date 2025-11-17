@@ -134,7 +134,12 @@ func parseCLIFlags(args []string) (cliOptions, error) {
 	}, nil
 }
 
-func startHTTPServer(cfg *config.Config, registry *server.HubRegistry, proxyHandler server.ProxyHandler, logger *logrus.Logger) error {
+func startHTTPServer(
+	cfg *config.Config,
+	registry *server.HubRegistry,
+	proxyHandler server.ProxyHandler,
+	logger *logrus.Logger,
+) error {
 	port := cfg.Global.ListenPort
 	app, err := server.NewApp(server.AppOptions{
 		Logger:     logger,

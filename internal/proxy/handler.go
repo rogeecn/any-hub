@@ -200,6 +200,15 @@ func (h *Handler) fetchAndStream(
 				"hub":    route.Config.Name,
 			}).Warn("pypi_rewrite_failed")
 		}
+	} else if route.Config.Type == "composer" {
+		if rewritten, rewriteErr := h.rewriteComposerResponse(route, resp, requestPath(c)); rewriteErr == nil {
+			resp = rewritten
+		} else {
+			h.logger.WithError(rewriteErr).WithFields(logrus.Fields{
+				"action": "composer_rewrite",
+				"hub":    route.Config.Name,
+			}).Warn("composer_rewrite_failed")
+		}
 	}
 	defer resp.Body.Close()
 
@@ -446,6 +455,8 @@ func inferCachedContentType(route *server.HubRoute, locator cache.Locator) strin
 	switch {
 	case strings.HasSuffix(clean, ".zip"):
 		return "application/zip"
+	case strings.HasSuffix(clean, ".json"):
+		return "application/json"
 	case strings.HasSuffix(clean, ".mod"):
 		return "text/plain"
 	case strings.HasSuffix(clean, ".info"):
@@ -624,6 +635,11 @@ func resolveUpstreamURL(route *server.HubRoute, base *url.URL, c fiber.Ctx) *url
 			return filesBase.ResolveReference(relative)
 		}
 	}
+	if route != nil && route.Config.Type == "composer" && strings.HasPrefix(clean, "/dist/") {
+		if distTarget, ok := parseComposerDistURL(clean, string(uri.QueryString())); ok {
+			return distTarget
+		}
+	}
 	relative := &url.URL{Path: clean, RawPath: clean}
 	if query := string(uri.QueryString()); query != "" {
 		relative.RawQuery = query
@@ -701,6 +717,15 @@ func determineCachePolicy(route *server.HubRoute, locator cache.Locator, method 
 		}
 		policy.requireRevalidate = true
 		return policy
+	case "composer":
+		if isComposerDistPath(path) {
+			return policy
+		}
+		if isComposerMetadataPath(path) {
+			policy.requireRevalidate = true
+			return policy
+		}
+		return cachePolicy{}
 	default:
 		return policy
 	}
@@ -897,6 +922,38 @@ func applyPyPISimpleFallback(route *server.HubRoute, path string) (string, bool)
 		return path, false
 	}
 	return "/simple/" + trimmed + "/", true
+}
+
+func parseComposerDistURL(path string, rawQuery string) (*url.URL, bool) {
+	if !strings.HasPrefix(path, "/dist/") {
+		return nil, false
+	}
+	trimmed := strings.TrimPrefix(path, "/dist/")
+	parts := strings.SplitN(trimmed, "/", 3)
+	if len(parts) < 3 {
+		return nil, false
+	}
+	scheme := parts[0]
+	host := parts[1]
+	rest := parts[2]
+	if scheme == "" || host == "" {
+		return nil, false
+	}
+	if rest == "" {
+		rest = "/"
+	} else {
+		rest = "/" + rest
+	}
+	target := &url.URL{
+		Scheme:  scheme,
+		Host:    host,
+		Path:    rest,
+		RawPath: rest,
+	}
+	if rawQuery != "" {
+		target.RawQuery = rawQuery
+	}
+	return target, true
 }
 
 type bearerChallenge struct {
@@ -1118,6 +1175,8 @@ func ensureProxyHubType(route *server.HubRoute) error {
 	case "go":
 		return nil
 	case "pypi":
+		return nil
+	case "composer":
 		return nil
 	default:
 		return fmt.Errorf("unsupported hub type: %s", route.Config.Type)

@@ -90,7 +90,12 @@ func applyHubDefaults(h *HubConfig) {
 		h.CacheTTL = Duration(0)
 	}
 	if trimmed := strings.TrimSpace(h.Module); trimmed == "" {
-		h.Module = hubmodule.DefaultModuleKey()
+		typeKey := strings.ToLower(strings.TrimSpace(h.Type))
+		if meta, ok := hubmodule.Resolve(typeKey); ok {
+			h.Module = meta.Key
+		} else {
+			h.Module = hubmodule.DefaultModuleKey()
+		}
 	} else {
 		h.Module = strings.ToLower(trimmed)
 	}

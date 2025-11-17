@@ -69,3 +69,13 @@ Proxy = ""
 Username = ""
 Password = ""
 Type = "pypi"
+
+# Composer Repository
+[[Hub]]
+Domain = "composer.hub.local"
+Name = "composer"
+Upstream = "https://repo.packagist.org"
+Proxy = ""
+Username = ""
+Password = ""
+Type = "composer"

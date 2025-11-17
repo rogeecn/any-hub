@@ -11,13 +11,14 @@ import (
 )
 
 var supportedHubTypes = map[string]struct{}{
-	"docker": {},
-	"npm":    {},
-	"go":     {},
-	"pypi":   {},
+	"docker":   {},
+	"npm":      {},
+	"go":       {},
+	"pypi":     {},
+	"composer": {},
 }
 
-const supportedHubTypeList = "docker|npm|go|pypi"
+const supportedHubTypeList = "docker|npm|go|pypi|composer"
 
 // Validate 针对语义级别做进一步校验，防止非法配置启动服务。
 func (c *Config) Validate() error {

@@ -150,6 +150,8 @@ func ensureRouterHubType(route *HubRoute) error {
 		return nil
 	case "pypi":
 		return nil
+	case "composer":
+		return nil
 	default:
 		return fmt.Errorf("unsupported hub type: %s", route.Config.Type)
 	}
