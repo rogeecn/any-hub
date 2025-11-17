@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -73,6 +74,25 @@ func TestComposerProxyCachesMetadataAndDists(t *testing.T) {
 			t.Fatalf("app.Test error: %v", err)
 		}
 		return resp
+	}
+
+	rootResp := doRequest("/packages.json")
+	if rootResp.StatusCode != fiber.StatusOK {
+		t.Fatalf("expected 200 for packages.json, got %d", rootResp.StatusCode)
+	}
+	rootBody, _ := io.ReadAll(rootResp.Body)
+	rootResp.Body.Close()
+	var root map[string]any
+	if err := json.Unmarshal(rootBody, &root); err != nil {
+		t.Fatalf("parse packages.json: %v", err)
+	}
+	metaURL, _ := root["metadata-url"].(string)
+	assertProxyURL(t, "metadata-url", metaURL)
+	if providersURL, _ := root["providers-url"].(string); providersURL != "" {
+		assertProxyURL(t, "providers-url", providersURL)
+	}
+	if notifyURL, _ := root["notify-batch"].(string); notifyURL != "" {
+		assertProxyURL(t, "notify-batch", notifyURL)
 	}
 
 	metaPath := "/p2/example/package.json"
@@ -222,7 +242,17 @@ func (s *composerStub) buildMetadata() []byte {
 
 func (s *composerStub) handlePackages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"packages":{}}`))
+	payload := map[string]any{
+		"packages":      map[string]any{},
+		"metadata-url":  "p2/%package%.json",
+		"providers-url": "p/%package%$%hash%.json",
+		"notify-batch":  "/downloads/",
+		"provider-includes": map[string]any{
+			"p/provider-latest$%hash%.json": map[string]any{"sha256": "dummy"},
+		},
+	}
+	data, _ := json.Marshal(payload)
+	_, _ = w.Write(data)
 }
 
 func (s *composerStub) handleMetadata(w http.ResponseWriter, r *http.Request) {
@@ -259,6 +289,16 @@ func (s *composerStub) DistContent() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.distBody
+}
+
+func assertProxyURL(t *testing.T, field, val string) {
+	t.Helper()
+	if val == "" {
+		t.Fatalf("%s should not be empty", field)
+	}
+	if !strings.HasPrefix(val, "https://composer.hub.local/") {
+		t.Fatalf("%s should point to proxy host, got %s", field, val)
+	}
 }
 
 func (s *composerStub) Close() {

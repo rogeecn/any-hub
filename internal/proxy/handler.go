@@ -133,6 +133,38 @@ func (h *Handler) serveCache(
 			contentType = sniffed
 		}
 	}
+	if route != nil && route.Config.Type == "composer" && isComposerMetadataPath(stripQueryMarker(result.Entry.Locator.Path)) {
+		body, err := io.ReadAll(result.Reader)
+		result.Reader.Close()
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadGateway, fmt.Sprintf("read cache failed: %v", err))
+		}
+		rewritten := body
+		if stripQueryMarker(result.Entry.Locator.Path) == "/packages.json" {
+			if data, changed, err := rewriteComposerRootBody(body, route.Config.Domain); err == nil && changed {
+				rewritten = data
+			}
+		} else {
+			if data, changed, err := rewriteComposerMetadata(body, route.Config.Domain); err == nil && changed {
+				rewritten = data
+			}
+		}
+
+		c.Set("Content-Type", "application/json")
+		c.Set("X-Any-Hub-Upstream", route.UpstreamURL.String())
+		c.Set("X-Any-Hub-Cache-Hit", "true")
+		if requestID != "" {
+			c.Set("X-Request-ID", requestID)
+		}
+		c.Status(fiber.StatusOK)
+		c.Response().Header.SetContentLength(len(rewritten))
+		_, err = c.Response().BodyWriter().Write(rewritten)
+		h.logResult(route, route.UpstreamURL.String(), requestID, fiber.StatusOK, true, started, err)
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadGateway, fmt.Sprintf("read cache failed: %v", err))
+		}
+		return nil
+	}
 	if contentType != "" {
 		c.Set("Content-Type", contentType)
 	} else {
@@ -508,6 +540,10 @@ func buildLocator(route *server.HubRoute, c fiber.Ctx) cache.Locator {
 		clean = newPath
 	}
 	query := uri.QueryString()
+	if route != nil && route.Config.Type == "composer" && isComposerDistPath(clean) {
+		// composer dist URLs often embed per-request tokens; ignore query for cache key
+		query = nil
+	}
 	if len(query) > 0 {
 		sum := sha1.Sum(query)
 		clean = fmt.Sprintf("%s/__qs/%s", clean, hex.EncodeToString(sum[:]))
