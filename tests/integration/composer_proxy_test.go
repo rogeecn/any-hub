@@ -91,11 +91,25 @@ func TestComposerProxyCachesMetadataAndDists(t *testing.T) {
 	if providersURL, _ := root["providers-url"].(string); providersURL != "" {
 		assertProxyURL(t, "providers-url", providersURL)
 	}
-	if notifyURL, _ := root["notify-batch"].(string); notifyURL != "" {
-		assertProxyURL(t, "notify-batch", notifyURL)
+	if notifyURL, _ := root["notify-batch"].(string); notifyURL != "https://packagist.org/downloads/" {
+		t.Fatalf("notify-batch should remain packagist, got %s", notifyURL)
+	}
+	if mirrors, _ := root["mirrors"].([]any); len(mirrors) == 0 {
+		t.Fatalf("expected mirrors entry in packages root")
+	} else {
+		if entry, ok := mirrors[0].(map[string]any); ok {
+			if distURL, _ := entry["dist-url"].(string); distURL != "https://composer.hub.local/composer/dists/%package%/%reference%.%type%" {
+				t.Fatalf("unexpected mirrors dist-url: %s", distURL)
+			}
+			if preferred, _ := entry["preferred"].(bool); !preferred {
+				t.Fatalf("mirrors entry should be preferred")
+			}
+		} else {
+			t.Fatalf("unexpected mirrors payload: %#v", mirrors[0])
+		}
 	}
 
-	metaPath := "/p2/example/package.json"
+	metaPath := "/composer/p2/example/package.json"
 	resp := doRequest(metaPath)
 	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("expected 200 for composer metadata, got %d", resp.StatusCode)
@@ -229,8 +243,9 @@ func (s *composerStub) buildMetadata() []byte {
 					"name":    "example/package",
 					"version": "1.0.0",
 					"dist": map[string]any{
-						"type": "zip",
-						"url":  s.URL + s.distPath,
+						"type":      "zip",
+						"url":       s.URL + s.distPath,
+						"reference": "abc123",
 					},
 				},
 			},
@@ -244,9 +259,9 @@ func (s *composerStub) handlePackages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	payload := map[string]any{
 		"packages":      map[string]any{},
-		"metadata-url":  "p2/%package%.json",
-		"providers-url": "p/%package%$%hash%.json",
-		"notify-batch":  "/downloads/",
+		"metadata-url":  "https://repo.packagist.org/p2/%package%.json",
+		"providers-url": "https://repo.packagist.org/p/%package%$%hash%.json",
+		"notify-batch":  "https://packagist.org/downloads/",
 		"provider-includes": map[string]any{
 			"p/provider-latest$%hash%.json": map[string]any{"sha256": "dummy"},
 		},
