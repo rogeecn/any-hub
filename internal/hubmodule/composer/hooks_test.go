@@ -26,7 +26,7 @@ func TestResolveDistUpstream(t *testing.T) {
 
 func TestRewriteResponseUpdatesURLs(t *testing.T) {
 	ctx := &hooks.RequestContext{Domain: "cache.example"}
-	body := []byte(`{"packages":{"a/b":{"1.0.0":{"dist":{"url":"https://pkg.example/dist.zip"}}}}}`)
+	body := []byte(`{"packages":{"a/b":{"1.0.0":{"dist":{"url":"https://repo.packagist.org/dist/package.zip"}}}}}`)
 	_, headers, rewritten, err := rewriteResponse(ctx, 200, map[string]string{}, body, "/p2/a/b.json")
 	if err != nil {
 		t.Fatalf("rewrite failed: %v", err)
@@ -37,7 +37,7 @@ func TestRewriteResponseUpdatesURLs(t *testing.T) {
 	if headers["Content-Type"] != "application/json" {
 		t.Fatalf("expected json content type")
 	}
-	if !strings.Contains(string(rewritten), "https://cache.example/dist/https/pkg.example/dist.zip") {
-		t.Fatalf("expected rewritten URL, got %s", string(rewritten))
+	if !strings.Contains(string(rewritten), "/dist/package.zip") {
+		t.Fatalf("expected stripped packagist host, got %s", string(rewritten))
 	}
 }

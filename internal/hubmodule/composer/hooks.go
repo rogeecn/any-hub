@@ -45,7 +45,7 @@ func rewriteResponse(
 ) (int, map[string]string, []byte, error) {
 	switch {
 	case path == "/packages.json":
-		data, changed, err := rewriteComposerRootBody(body, ctx.Domain)
+		data, changed, err := rewriteComposerRootBody(body)
 		if err != nil {
 			return status, headers, body, err
 		}
@@ -104,29 +104,32 @@ func contentType(_ *hooks.RequestContext, locatorPath string) string {
 	return ""
 }
 
-func rewriteComposerRootBody(body []byte, domain string) ([]byte, bool, error) {
-	type root struct {
-		Packages map[string]string `json:"packages"`
-	}
-	var payload root
-	if err := json.Unmarshal(body, &payload); err != nil {
+func rewriteComposerRootBody(body []byte) ([]byte, bool, error) {
+	// packages.json from Packagist may contain "packages" as array or object; we only care about URL-like fields.
+	var root map[string]any
+	if err := json.Unmarshal(body, &root); err != nil {
 		return nil, false, err
 	}
-	if len(payload.Packages) == 0 {
-		return body, false, nil
-	}
+
 	changed := false
-	for key, value := range payload.Packages {
-		rewritten := rewriteComposerAbsolute(domain, value)
-		if rewritten != value {
-			payload.Packages[key] = rewritten
+	for key, val := range root {
+		str, ok := val.(string)
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(key) {
+		// case "metadata-url", "providers-url", "providers-lazy-url", "notify", "notify-batch", "search":
+		case "metadata-url":
+			str = strings.ReplaceAll(str, "https://repo.packagist.org", "")
+			root[key] = str
 			changed = true
 		}
 	}
+
 	if !changed {
 		return body, false, nil
 	}
-	data, err := json.Marshal(payload)
+	data, err := json.Marshal(root)
 	if err != nil {
 		return nil, false, err
 	}
@@ -166,7 +169,11 @@ func rewriteComposerMetadata(body []byte, domain string) ([]byte, bool, error) {
 	return data, true, nil
 }
 
-func rewriteComposerPackagesPayload(raw json.RawMessage, domain string, packageName string) (json.RawMessage, bool, error) {
+func rewriteComposerPackagesPayload(
+	raw json.RawMessage,
+	domain string,
+	packageName string,
+) (json.RawMessage, bool, error) {
 	var asArray []map[string]any
 	if err := json.Unmarshal(raw, &asArray); err == nil {
 		rewrote := rewriteComposerVersionSlice(asArray, domain, packageName)
@@ -229,7 +236,7 @@ func rewriteComposerVersion(entry map[string]any, domain string, packageName str
 	if !ok || urlValue == "" {
 		return changed
 	}
-	rewritten := rewriteComposerDistURL(domain, urlValue)
+	rewritten := rewriteComposerDistURL(urlValue)
 	if rewritten == urlValue {
 		return changed
 	}
@@ -237,46 +244,25 @@ func rewriteComposerVersion(entry map[string]any, domain string, packageName str
 	return true
 }
 
-func rewriteComposerDistURL(domain, original string) string {
+func rewriteComposerDistURL(original string) string {
 	parsed, err := url.Parse(original)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return original
 	}
-	prefix := "/dist/" + parsed.Scheme + "/" + parsed.Host
-	newURL := url.URL{
-		Scheme:   "https",
-		Host:     domain,
-		Path:     prefix + parsed.Path,
-		RawQuery: parsed.RawQuery,
-		Fragment: parsed.Fragment,
-	}
-	if raw := parsed.RawPath; raw != "" {
-		newURL.RawPath = prefix + raw
-	}
-	return newURL.String()
-}
-
-func rewriteComposerAbsolute(domain, raw string) string {
-	if raw == "" {
-		return raw
-	}
-	if strings.HasPrefix(raw, "//") {
-		return "https://" + domain + strings.TrimPrefix(raw, "//")
-	}
-	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
-		parsed, err := url.Parse(raw)
-		if err != nil {
-			return raw
+	if isPackagistHost(parsed.Host) {
+		pathVal := parsed.Path
+		if raw := parsed.RawPath; raw != "" {
+			pathVal = raw
 		}
-		parsed.Host = domain
-		parsed.Scheme = "https"
-		return parsed.String()
+		if !strings.HasPrefix(pathVal, "/") {
+			pathVal = "/" + pathVal
+		}
+		if parsed.RawQuery != "" {
+			return pathVal + "?" + parsed.RawQuery
+		}
+		return pathVal
 	}
-	pathVal := raw
-	if !strings.HasPrefix(pathVal, "/") {
-		pathVal = "/" + pathVal
-	}
-	return "https://" + domain + pathVal
+	return original
 }
 
 func isComposerMetadataPath(path string) bool {
@@ -330,4 +316,15 @@ func parseComposerDistURL(path string, rawQuery string) (*url.URL, bool) {
 		target.RawQuery = rawQuery
 	}
 	return target, true
+}
+
+func stripPackagistHost(raw string) string {
+	raw = strings.TrimSpace(raw)
+	raw = strings.ReplaceAll(raw, "https://repo.packagist.org", "")
+	raw = strings.ReplaceAll(raw, "http://repo.packagist.org", "")
+	return raw
+}
+
+func isPackagistHost(host string) bool {
+	return strings.EqualFold(host, "repo.packagist.org")
 }

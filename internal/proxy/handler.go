@@ -263,7 +263,8 @@ func applyHookRewrite(hook *hookState, resp *http.Response, path string) (*http.
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return nil, err
+		resp.Body = io.NopCloser(bytes.NewReader(nil))
+		return resp, err
 	}
 	headers := make(map[string]string, len(resp.Header))
 	for key, values := range resp.Header {
@@ -273,7 +274,9 @@ func applyHookRewrite(hook *hookState, resp *http.Response, path string) (*http.
 	}
 	status, newHeaders, newBody, rewriteErr := hook.def.RewriteResponse(hook.ctx, resp.StatusCode, headers, body, path)
 	if rewriteErr != nil {
-		return nil, rewriteErr
+		resp.Body = io.NopCloser(bytes.NewReader(body))
+		resp.ContentLength = int64(len(body))
+		return resp, rewriteErr
 	}
 	if newHeaders == nil {
 		newHeaders = headers
