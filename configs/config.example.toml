@@ -13,13 +13,31 @@ InitialBackoff = "1s"
 UpstreamTimeout = "30s"
 
 [[Hub]]
-Name = "docker"
+Name = "docker-cache"
 Domain = "docker.hub.local"
 Upstream = "https://registry-1.docker.io"
 Proxy = ""
-Type = "docker"                      # 必填：docker|npm|go
-Module = "legacy"                    # 每个 Hub 使用的代理+缓存模块，默认为 legacy
-Username = ""                 # 可选：若填写需与 Password 同时出现
+Type = "docker"                      # 省略 Module 时自动选择与 Type 同名的 Hook（此处为 docker）
+# Module = "docker"                  # 如需明确指定，可取消注释
+Rollout = "modular"
+Username = ""
 Password = ""
-CacheTTL = 43200               # 可选: 覆盖全局缓存 TTL（秒）
+CacheTTL = 43200
 EnableHeadCheck = true
+
+[[Hub]]
+Name = "composer-cache"
+Domain = "composer.hub.local"
+Upstream = "https://repo.packagist.org"
+Type = "composer"
+Module = "composer"                  # 显式绑定 composer Hook，启动时会验证 hook 是否已注册
+Rollout = "dual"                     # 可选：legacy-only/dual/modular
+CacheTTL = 21600
+
+[[Hub]]
+Name = "legacy-fallback"
+Domain = "legacy.hub.local"
+Upstream = "https://registry.npmjs.org"
+Type = "npm"
+Module = "legacy"                    # 仍未迁移的 Hub 可显式指定 legacy，诊断会标记为 legacy-only
+Rollout = "legacy-only"

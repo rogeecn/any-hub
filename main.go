@@ -14,6 +14,7 @@ import (
 	"github.com/any-hub/any-hub/internal/hubmodule"
 	"github.com/any-hub/any-hub/internal/logging"
 	"github.com/any-hub/any-hub/internal/proxy"
+	"github.com/any-hub/any-hub/internal/proxy/hooks"
 	"github.com/any-hub/any-hub/internal/server"
 	"github.com/any-hub/any-hub/internal/server/routes"
 	"github.com/any-hub/any-hub/internal/version"
@@ -172,6 +173,14 @@ func registerModuleHandlers(handler server.ProxyHandler) error {
 		})
 		if err != nil && !errors.Is(err, proxy.ErrModuleHandlerExists) {
 			return fmt.Errorf("module %s: %w", meta.Key, err)
+		}
+	}
+	for _, meta := range hubmodule.List() {
+		if meta.Key == hubmodule.DefaultModuleKey() {
+			continue
+		}
+		if hooks.Status(meta.Key) != "registered" {
+			return fmt.Errorf("module %s is missing hook registration", meta.Key)
 		}
 	}
 	return nil

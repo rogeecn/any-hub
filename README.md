@@ -48,9 +48,19 @@ Password = "s3cr3t"
 
 ## 模块化代理与示例
 
-- `configs/docker.sample.toml`、`configs/npm.sample.toml` 展示了 Docker/NPM 的最小配置，包含新的 `Module` 字段，复制后即可按需调整。
+- `configs/config.example.toml` 展示了多个 Hub 的组合：Docker Hub（省略 `Module`，自动使用 `Type` 同名 Hook）、Composer Hub（显式指定 `Module = "composer"`）以及 legacy 兜底 Hub，可直接复制修改。
 - 运行 `./scripts/demo-proxy.sh docker`（或 `npm`）即可加载示例配置并启动代理，日志中会附带 `module_key` 字段，便于确认命中的是 `legacy` 还是自定义模块。
-- 若需自定义模块，可复制 `internal/hubmodule/template/`、在 `init()` 中调用 `hubmodule.MustRegister` 描述 metadata，并通过 `proxy.RegisterModuleHandler` 注入模块专属的 `ProxyHandler`，最后运行 `make modules-test` 自检。
+- Hook 开发流程：
+  1. 复制 `internal/hubmodule/template/` 至 `internal/hubmodule/<module-key>/`，补全 `module.go` 与 `module_test.go`。
+  2. 在模块 `init()` 中调用 `hubmodule.MustRegister` 注册 metadata，并使用 `hooks.MustRegister` 注册 Hook（NormalizePath/ResolveUpstream/RewriteResponse 等）。
+  3. 为模块补充单元测试、`tests/integration/` 覆盖 miss→hit 流程，运行 `make modules-test`/`go test ./...`。
+  4. 更新配置：若 `[[Hub]].Module` 留空，将根据 `Type` 自动选择 Hook；也可显式设置 `Module = "<module-key>"` 并通过 `Rollout` 控制 legacy/dual/modular。
+  5. 启动服务前，可通过 `curl -s /-/modules | jq '.hook_registry'` 确认 hook 注册情况；缺失时启动会直接失败，避免运行期回退到 legacy。
+
+### 模块选择与 legacy
+- `[[Hub]].Module` 为空时会自动回退到与 `Type` 同名的模块（若已注册），否则使用 `legacy` 兜底。
+- diagnostics `/-/modules` 将展示 `hook_status`，当模块仍使用 legacy 时会标记 `legacy-only`，便于排查。
+- legacy 模块仅提供最小兜底能力，迁移完成后应显式将 `Module` 设置为对应仓库的 Hook。
 - 示例操作手册、常见问题参见 [`specs/003-hub-auth-fields/quickstart.md`](specs/003-hub-auth-fields/quickstart.md) 以及本特性的 [`quickstart.md`](specs/004-modular-proxy-cache/quickstart.md)。
 
 ## CLI 标志

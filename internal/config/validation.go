@@ -79,7 +79,11 @@ func (c *Config) Validate() error {
 
 		moduleKey := strings.ToLower(strings.TrimSpace(hub.Module))
 		if moduleKey == "" {
-			moduleKey = hubmodule.DefaultModuleKey()
+			if _, ok := hubmodule.Resolve(normalizedType); ok && normalizedType != "" {
+				moduleKey = normalizedType
+			} else {
+				moduleKey = hubmodule.DefaultModuleKey()
+			}
 		}
 		if _, ok := hubmodule.Resolve(moduleKey); !ok {
 			return newFieldError(hubField(hub.Name, "Module"), fmt.Sprintf("未注册模块: %s", moduleKey))

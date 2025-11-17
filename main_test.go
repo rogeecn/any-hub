@@ -2,8 +2,16 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/gofiber/fiber/v3"
+
+	"github.com/any-hub/any-hub/internal/hubmodule"
+	"github.com/any-hub/any-hub/internal/proxy/hooks"
+	"github.com/any-hub/any-hub/internal/server"
 )
 
 func TestParseCLIFlagsPriority(t *testing.T) {
@@ -50,5 +58,26 @@ func TestRunVersionOutput(t *testing.T) {
 	}
 	if !strings.Contains(stdOut.(*bytes.Buffer).String(), "any-hub") {
 		t.Fatalf("version 输出应包含 any-hub 标识")
+	}
+}
+
+func TestRegisterModuleHandlersFailsWithoutHook(t *testing.T) {
+	useBufferWriters(t)
+	key := fmt.Sprintf("missing-hook-%d", time.Now().UnixNano())
+	hubmodule.MustRegister(hubmodule.ModuleMetadata{
+		Key:            key,
+		Description:    "test module without hooks",
+		MigrationState: hubmodule.MigrationStateBeta,
+		SupportedProtocols: []string{
+			"custom",
+		},
+	})
+	defer hooks.MustRegister(key, hooks.Hooks{})
+
+	err := registerModuleHandlers(server.ProxyHandlerFunc(func(ctx fiber.Ctx, route *server.HubRoute) error {
+		return nil
+	}))
+	if err == nil || !strings.Contains(err.Error(), "missing hook") {
+		t.Fatalf("expected missing hook error, got %v", err)
 	}
 }

@@ -1,12 +1,5 @@
 package hooks
 
-import (
-	"net/http"
-	"net/url"
-	"strings"
-	"sync"
-)
-
 // CachePolicy mirrors the proxy cache policy structure.
 type CachePolicy struct {
 	AllowCache        bool
@@ -27,34 +20,9 @@ type RequestContext struct {
 
 // Hooks describes customization points for module-specific behavior.
 type Hooks struct {
-	NormalizePath   func(ctx *RequestContext, cleanPath string) string
-	ResolveUpstream func(ctx *RequestContext, base *url.URL, cleanPath string, rawQuery []byte) *url.URL
-	RewriteResponse func(ctx *RequestContext, resp *http.Response, cleanPath string) (*http.Response, error)
+	NormalizePath   func(ctx *RequestContext, cleanPath string, rawQuery []byte) (string, []byte)
+	ResolveUpstream func(ctx *RequestContext, baseURL string, path string, rawQuery []byte) string
+	RewriteResponse func(ctx *RequestContext, status int, headers map[string]string, body []byte, path string) (int, map[string]string, []byte, error)
 	CachePolicy     func(ctx *RequestContext, locatorPath string, current CachePolicy) CachePolicy
 	ContentType     func(ctx *RequestContext, locatorPath string) string
-}
-
-var registry sync.Map
-
-// Register stores hooks for the given module key.
-func Register(moduleKey string, hooks Hooks) {
-	key := strings.ToLower(strings.TrimSpace(moduleKey))
-	if key == "" {
-		return
-	}
-	registry.Store(key, hooks)
-}
-
-// For retrieves hooks associated with a module key.
-func For(moduleKey string) (Hooks, bool) {
-	key := strings.ToLower(strings.TrimSpace(moduleKey))
-	if key == "" {
-		return Hooks{}, false
-	}
-	if value, ok := registry.Load(key); ok {
-		if hooks, ok := value.(Hooks); ok {
-			return hooks, true
-		}
-	}
-	return Hooks{}, false
 }

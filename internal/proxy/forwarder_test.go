@@ -14,12 +14,15 @@ import (
 	"github.com/any-hub/any-hub/internal/server"
 )
 
+const requestIDKey = "_anyhub_request_id"
+
 func TestForwarderMissingHandler(t *testing.T) {
 	app := fiber.New()
 	defer app.Shutdown()
 
 	ctx := app.AcquireCtx(new(fasthttp.RequestCtx))
 	defer app.ReleaseCtx(ctx)
+	ctx.Locals(requestIDKey, "missing-req")
 
 	logger := logrus.New()
 	logBuf := &bytes.Buffer{}
@@ -40,6 +43,12 @@ func TestForwarderMissingHandler(t *testing.T) {
 	if !strings.Contains(logBuf.String(), "module_handler_missing") {
 		t.Fatalf("expected log to mention module_handler_missing, got %s", logBuf.String())
 	}
+	if got := string(ctx.Response().Header.Peek("X-Request-ID")); got != "missing-req" {
+		t.Fatalf("expected request id header missing-req, got %s", got)
+	}
+	if !strings.Contains(logBuf.String(), "missing-req") {
+		t.Fatalf("expected log to include request id, got %s", logBuf.String())
+	}
 }
 
 func TestForwarderHandlerPanic(t *testing.T) {
@@ -58,6 +67,7 @@ func TestForwarderHandlerPanic(t *testing.T) {
 	defer app.Shutdown()
 	ctx := app.AcquireCtx(new(fasthttp.RequestCtx))
 	defer app.ReleaseCtx(ctx)
+	ctx.Locals(requestIDKey, "panic-req")
 
 	logger := logrus.New()
 	logBuf := &bytes.Buffer{}
@@ -77,6 +87,12 @@ func TestForwarderHandlerPanic(t *testing.T) {
 	}
 	if !strings.Contains(logBuf.String(), "module_handler_panic") {
 		t.Fatalf("expected log to mention module_handler_panic, got %s", logBuf.String())
+	}
+	if got := string(ctx.Response().Header.Peek("X-Request-ID")); got != "panic-req" {
+		t.Fatalf("expected request id header panic-req, got %s", got)
+	}
+	if !strings.Contains(logBuf.String(), "panic-req") {
+		t.Fatalf("expected log to include panic request id, got %s", logBuf.String())
 	}
 }
 

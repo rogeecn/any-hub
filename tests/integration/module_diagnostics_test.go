@@ -13,6 +13,7 @@ import (
 
 	"github.com/any-hub/any-hub/internal/config"
 	"github.com/any-hub/any-hub/internal/hubmodule"
+	"github.com/any-hub/any-hub/internal/proxy/hooks"
 	"github.com/any-hub/any-hub/internal/server"
 	"github.com/any-hub/any-hub/internal/server/routes"
 )
@@ -27,6 +28,7 @@ func TestModuleDiagnosticsEndpoints(t *testing.T) {
 			"npm",
 		},
 	})
+	hooks.MustRegister(moduleKey, hooks.Hooks{})
 
 	cfg := &config.Config{
 		Global: config.GlobalConfig{
@@ -77,6 +79,7 @@ func TestModuleDiagnosticsEndpoints(t *testing.T) {
 				Rollout    string `json:"rollout_flag"`
 				Domain     string `json:"domain"`
 				Port       int    `json:"port"`
+				LegacyOnly bool   `json:"legacy_only"`
 			} `json:"hubs"`
 		}
 		body, _ := io.ReadAll(resp.Body)
@@ -90,6 +93,9 @@ func TestModuleDiagnosticsEndpoints(t *testing.T) {
 		found := false
 		for _, module := range payload.Modules {
 			if module["key"] == moduleKey {
+				if module["hook_status"] != "registered" {
+					t.Fatalf("expected module %s hook_status registered, got %v", moduleKey, module["hook_status"])
+				}
 				found = true
 				break
 			}
@@ -106,12 +112,18 @@ func TestModuleDiagnosticsEndpoints(t *testing.T) {
 				if hub.ModuleKey != hubmodule.DefaultModuleKey() {
 					t.Fatalf("legacy hub should expose legacy module, got %s", hub.ModuleKey)
 				}
+				if !hub.LegacyOnly {
+					t.Fatalf("legacy hub should be marked legacy_only")
+				}
 			case "modern-hub":
 				if hub.ModuleKey != moduleKey {
 					t.Fatalf("modern hub should expose %s, got %s", moduleKey, hub.ModuleKey)
 				}
 				if hub.Rollout != "dual" {
 					t.Fatalf("modern hub rollout flag should be dual, got %s", hub.Rollout)
+				}
+				if hub.LegacyOnly {
+					t.Fatalf("modern hub should not be marked legacy_only")
 				}
 			default:
 				t.Fatalf("unexpected hub %s", hub.HubName)
