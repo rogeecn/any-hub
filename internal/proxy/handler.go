@@ -116,13 +116,23 @@ func (h *Handler) serveCache(
 	requestID string,
 	started time.Time,
 ) error {
-	if seeker, ok := result.Reader.(io.Seeker); ok {
-		_, _ = seeker.Seek(0, io.SeekStart)
+	var readSeeker io.ReadSeeker
+	switch reader := result.Reader.(type) {
+	case io.ReadSeeker:
+		readSeeker = reader
+		_, _ = readSeeker.Seek(0, io.SeekStart)
+	case io.Seeker:
+		_, _ = reader.Seek(0, io.SeekStart)
 	}
 
 	method := c.Method()
 
 	contentType := inferCachedContentType(route, result.Entry.Locator)
+	if contentType == "" && shouldSniffDockerManifest(route, result.Entry.Locator) {
+		if sniffed := sniffDockerManifestContentType(readSeeker); sniffed != "" {
+			contentType = sniffed
+		}
+	}
 	if contentType != "" {
 		c.Set("Content-Type", contentType)
 	} else {
@@ -454,7 +464,7 @@ func inferCachedContentType(route *server.HubRoute, locator cache.Locator) strin
 		switch route.Config.Type {
 		case "docker":
 			if strings.Contains(clean, "/manifests/") {
-				return "application/vnd.docker.distribution.manifest.v2+json"
+				return ""
 			}
 			if strings.Contains(clean, "/tags/list") {
 				return "application/json"
@@ -518,6 +528,38 @@ func stripQueryMarker(p string) string {
 		return p[:idx]
 	}
 	return p
+}
+
+func shouldSniffDockerManifest(route *server.HubRoute, locator cache.Locator) bool {
+	if route == nil || route.Config.Type != "docker" {
+		return false
+	}
+	clean := stripQueryMarker(locator.Path)
+	return strings.Contains(clean, "/manifests/")
+}
+
+func sniffDockerManifestContentType(reader io.ReadSeeker) string {
+	if reader == nil {
+		return ""
+	}
+	const maxInspectBytes = 512 * 1024
+	if _, err := reader.Seek(0, io.SeekStart); err != nil {
+		return ""
+	}
+	data, err := io.ReadAll(io.LimitReader(reader, maxInspectBytes))
+	if _, seekErr := reader.Seek(0, io.SeekStart); seekErr != nil {
+		return ""
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		return ""
+	}
+	var manifest struct {
+		MediaType string `json:"mediaType"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(manifest.MediaType)
 }
 
 func requestPath(c fiber.Ctx) string {

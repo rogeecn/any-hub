@@ -131,6 +131,8 @@ func TestCredentialProxy(t *testing.T) {
 	})
 }
 
+const dockerManifestContentType = "application/vnd.oci.image.index.v1+json"
+
 func TestDockerProxyHandlesBearerTokenExchange(t *testing.T) {
 	stub := newDockerBearerStub(t, "ci-user", "ci-pass")
 	defer stub.Close()
@@ -183,6 +185,9 @@ func TestDockerProxyCachesAfterBearerRevalidation(t *testing.T) {
 	if resp.Header.Get("X-Any-Hub-Cache-Hit") != "false" {
 		t.Fatalf("expected first request to miss cache")
 	}
+	if resp.Header.Get("Content-Type") != dockerManifestContentType {
+		t.Fatalf("expected upstream content type %s, got %s", dockerManifestContentType, resp.Header.Get("Content-Type"))
+	}
 	resp.Body.Close()
 
 	req2 := httptest.NewRequest("GET", "http://docker.hub.local/v2/library/alpine/manifests/latest", nil)
@@ -197,6 +202,9 @@ func TestDockerProxyCachesAfterBearerRevalidation(t *testing.T) {
 	}
 	if resp2.Header.Get("X-Any-Hub-Cache-Hit") != "true" {
 		t.Fatalf("expected second request to be served from cache")
+	}
+	if resp2.Header.Get("Content-Type") != dockerManifestContentType {
+		t.Fatalf("expected cached content type %s, got %s", dockerManifestContentType, resp2.Header.Get("Content-Type"))
 	}
 	resp2.Body.Close()
 
@@ -515,13 +523,14 @@ func (s *dockerBearerStub) handleManifest(w http.ResponseWriter, r *http.Request
 	s.mu.Unlock()
 
 	if success {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", dockerManifestContentType)
 		w.Header().Set("Last-Modified", s.lastModified.Format(http.TimeFormat))
 		w.WriteHeader(http.StatusOK)
 		if r.Method == http.MethodHead {
 			return
 		}
-		_, _ = w.Write([]byte(`{"schemaVersion":2}`))
+		payload := fmt.Sprintf(`{"schemaVersion":2,"mediaType":"%s"}`, dockerManifestContentType)
+		_, _ = w.Write([]byte(payload))
 		return
 	}
 
