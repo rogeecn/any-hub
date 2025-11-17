@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -83,8 +84,11 @@ func run(opts cliOptions) int {
 
 	httpClient := server.NewUpstreamClient(cfg)
 	proxyHandler := proxy.NewHandler(httpClient, logger, store)
-	forwarder := proxy.NewForwarder(proxyHandler)
-	proxy.RegisterModuleHandler(hubmodule.DefaultModuleKey(), proxyHandler)
+	forwarder := proxy.NewForwarder(proxyHandler, logger)
+	if err := registerModuleHandlers(proxyHandler); err != nil {
+		fmt.Fprintf(stdErr, "注册模块 handler 失败: %v\n", err)
+		return 1
+	}
 
 	fields := logging.BaseFields("startup", opts.configPath)
 	fields["hubs"] = len(cfg.Hubs)
@@ -158,4 +162,17 @@ func startHTTPServer(
 	}).Info("Fiber 服务启动")
 
 	return app.Listen(fmt.Sprintf(":%d", port))
+}
+
+func registerModuleHandlers(handler server.ProxyHandler) error {
+	for _, meta := range hubmodule.List() {
+		err := proxy.RegisterModule(proxy.ModuleRegistration{
+			Key:     meta.Key,
+			Handler: handler,
+		})
+		if err != nil && !errors.Is(err, proxy.ErrModuleHandlerExists) {
+			return fmt.Errorf("module %s: %w", meta.Key, err)
+		}
+	}
+	return nil
 }

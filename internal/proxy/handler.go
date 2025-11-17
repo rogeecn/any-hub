@@ -23,6 +23,7 @@ import (
 	"github.com/any-hub/any-hub/internal/cache"
 	"github.com/any-hub/any-hub/internal/hubmodule"
 	"github.com/any-hub/any-hub/internal/logging"
+	"github.com/any-hub/any-hub/internal/proxy/hooks"
 	"github.com/any-hub/any-hub/internal/server"
 )
 
@@ -48,8 +49,10 @@ func NewHandler(client *http.Client, logger *logrus.Logger, store cache.Store) *
 func (h *Handler) Handle(c fiber.Ctx, route *server.HubRoute) error {
 	started := time.Now()
 	requestID := server.RequestID(c)
-	locator := buildLocator(route, c)
-	policy := determineCachePolicy(route, locator, c.Method())
+	reqCtx := newRequestContext(route, c.Method())
+	moduleHooks, _ := hooks.For(route.ModuleKey)
+	locator := buildLocator(route, c, reqCtx, moduleHooks)
+	policy := determineCachePolicy(route, locator, c.Method(), reqCtx, moduleHooks)
 	strategyWriter := cache.NewStrategyWriter(h.store, route.CacheStrategy)
 
 	if err := ensureProxyHubType(route); err != nil {
@@ -106,7 +109,7 @@ func (h *Handler) Handle(c fiber.Ctx, route *server.HubRoute) error {
 		cached.Reader.Close()
 	}
 
-	return h.fetchAndStream(c, route, locator, policy, strategyWriter, requestID, started, ctx)
+	return h.fetchAndStream(c, route, locator, policy, strategyWriter, requestID, started, ctx, reqCtx, moduleHooks)
 }
 
 func (h *Handler) serveCache(

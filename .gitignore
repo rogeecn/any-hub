@@ -19,8 +19,10 @@ Thumbs.db
 *.tmp
 .vscode/
 .idea/
+.cache/
 storage/
 logs/
 tmp/
 config.toml
 any-hub
+.cache/

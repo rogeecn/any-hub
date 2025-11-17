@@ -62,6 +62,9 @@ func NewApp(opts AppOptions) (*fiber.App, error) {
 	app.Use(requestContextMiddleware(opts))
 
 	app.All("/*", func(c fiber.Ctx) error {
+		if isDiagnosticsPath(string(c.Request().URI().Path())) {
+			return c.Next()
+		}
 		route, _ := getRouteFromContext(c)
 		if route == nil {
 			return renderHostUnmapped(c, opts.Logger, "", opts.ListenPort)
@@ -87,9 +90,6 @@ func requestContextMiddleware(opts AppOptions) fiber.Handler {
 		route, ok := opts.Registry.Lookup(rawHost)
 		if !ok {
 			return renderHostUnmapped(c, opts.Logger, rawHost, opts.ListenPort)
-		}
-		if err := ensureRouterHubType(route); err != nil {
-			return renderTypeUnsupported(c, opts.Logger, route, err)
 		}
 
 		c.Locals(contextKeyRoute, route)
@@ -138,38 +138,6 @@ func RequestID(c fiber.Ctx) string {
 		}
 	}
 	return ""
-}
-
-func ensureRouterHubType(route *HubRoute) error {
-	switch route.Config.Type {
-	case "docker":
-		return nil
-	case "npm":
-		return nil
-	case "go":
-		return nil
-	case "pypi":
-		return nil
-	case "composer":
-		return nil
-	default:
-		return fmt.Errorf("unsupported hub type: %s", route.Config.Type)
-	}
-}
-
-func renderTypeUnsupported(c fiber.Ctx, logger *logrus.Logger, route *HubRoute, err error) error {
-	fields := logrus.Fields{
-		"action":       "hub_type_check",
-		"hub":          route.Config.Name,
-		"hub_type":     route.Config.Type,
-		"module_key":   route.ModuleKey,
-		"rollout_flag": string(route.RolloutFlag),
-		"error":        "hub_type_unsupported",
-	}
-	logger.WithFields(fields).Error(err.Error())
-	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-		"error": "hub_type_unsupported",
-	})
 }
 
 func isDiagnosticsPath(path string) bool {
