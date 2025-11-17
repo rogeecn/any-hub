@@ -26,9 +26,9 @@ func TestResolveDistUpstream(t *testing.T) {
 
 func TestResolveMirrorDistUpstream(t *testing.T) {
 	resetComposerDistRegistry()
-	registerComposerDist("cache.example", "vendor/pkg", "abc123", "zip", "https://github.com/org/repo.zip")
+	composerDists.remember("cache.example", "vendor/pkg", "abc123", "zip", "https://github.com/org/repo.zip")
 	ctx := &hooks.RequestContext{Domain: "cache.example"}
-	url := resolveDistUpstream(ctx, "", "/composer/dists/vendor/pkg/abc123.zip", nil)
+	url := resolveDistUpstream(ctx, "", "/dists/vendor/pkg/abc123.zip", nil)
 	if url != "https://github.com/org/repo.zip" {
 		t.Fatalf("unexpected upstream %s", url)
 	}
@@ -78,10 +78,10 @@ func TestRewritePackagesRoot(t *testing.T) {
 	if err := json.Unmarshal(rewritten, &payload); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if payload["metadata-url"] != "https://cache.example/composer/p2/%package%.json" {
+	if payload["metadata-url"] != "https://cache.example/p2/%package%.json" {
 		t.Fatalf("metadata URL not rewritten: %v", payload["metadata-url"])
 	}
-	if payload["providers-url"] != "https://cache.example/composer/p/%package%$%hash%.json" {
+	if payload["providers-url"] != "https://cache.example/p/%package%$%hash%.json" {
 		t.Fatalf("providers URL not rewritten: %v", payload["providers-url"])
 	}
 	mirrors, _ := payload["mirrors"].([]any)
@@ -89,7 +89,7 @@ func TestRewritePackagesRoot(t *testing.T) {
 		t.Fatalf("mirrors missing")
 	}
 	entry, _ := mirrors[0].(map[string]any)
-	if entry["dist-url"] != "https://cache.example/composer/dists/%package%/%reference%.%type%" {
+	if entry["dist-url"] != "https://cache.example/dists/%package%/%reference%.%type%" {
 		t.Fatalf("unexpected mirror dist-url: %v", entry["dist-url"])
 	}
 	if pref, _ := entry["preferred"].(bool); !pref {

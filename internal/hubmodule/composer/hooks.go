@@ -10,7 +10,46 @@ import (
 	"github.com/any-hub/any-hub/internal/proxy/hooks"
 )
 
-var composerDistRegistry sync.Map
+var composerDists = newDistRegistry()
+
+type distRegistry struct {
+	sync.RWMutex
+	items map[string]string
+}
+
+func newDistRegistry() *distRegistry {
+	return &distRegistry{items: map[string]string{}}
+}
+
+func (r *distRegistry) remember(domain, pkg, reference, distType, upstream string) {
+	key := composerDistKey(domain, pkg, reference, distType)
+	if key == "" || strings.TrimSpace(upstream) == "" {
+		return
+	}
+	r.Lock()
+	r.items[key] = upstream
+	r.Unlock()
+}
+
+func (r *distRegistry) lookup(domain, pkg, reference, distType string) (string, bool) {
+	key := composerDistKey(domain, pkg, reference, distType)
+	if key == "" {
+		return "", false
+	}
+	r.RLock()
+	val, ok := r.items[key]
+	r.RUnlock()
+	if !ok || strings.TrimSpace(val) == "" {
+		return "", false
+	}
+	return val, true
+}
+
+func (r *distRegistry) reset() {
+	r.Lock()
+	r.items = map[string]string{}
+	r.Unlock()
+}
 
 func init() {
 	hooks.MustRegister("composer", hooks.Hooks{
@@ -120,21 +159,16 @@ func contentType(_ *hooks.RequestContext, locatorPath string) string {
 }
 
 func rewriteComposerRootBody(body []byte, domain string) ([]byte, bool, error) {
+	domain = strings.TrimSpace(domain)
 	var root map[string]any
 	if err := json.Unmarshal(body, &root); err != nil {
 		return nil, false, err
 	}
 
 	changed := false
-	if rewriteComposerRootURLField(root, "metadata-url", domain) {
-		changed = true
-	}
-	if rewriteComposerRootURLField(root, "providers-url", domain) {
-		changed = true
-	}
-	if ensureComposerMirrors(root, domain) {
-		changed = true
-	}
+	changed = rewriteComposerRootURLField(root, "metadata-url", domain) || changed
+	changed = rewriteComposerRootURLField(root, "providers-url", domain) || changed
+	changed = ensureComposerMirrors(root, domain) || changed
 
 	if !changed {
 		return body, false, nil
@@ -152,11 +186,13 @@ func rewriteComposerRootURLField(root map[string]any, key string, domain string)
 		return false
 	}
 	proxied := buildComposerProxyURL(value, domain)
-	if proxied == value {
+	if proxied == "" {
 		return false
 	}
+
+	changed := proxied != value
 	root[key] = proxied
-	return true
+	return changed
 }
 
 func ensureComposerMirrors(root map[string]any, domain string) bool {
@@ -184,6 +220,10 @@ func ensureComposerMirrors(root map[string]any, domain string) bool {
 }
 
 func rewriteComposerMetadata(body []byte, domain string) ([]byte, bool, error) {
+	domain = strings.TrimSpace(domain)
+	if domain == "" {
+		return body, false, nil
+	}
 	type packagesRoot struct {
 		Packages map[string]json.RawMessage `json:"packages"`
 	}
@@ -268,6 +308,7 @@ func rewriteComposerVersion(entry map[string]any, domain string, packageName str
 	if entry == nil {
 		return false
 	}
+	domain = strings.TrimSpace(domain)
 	changed := false
 	if packageName != "" {
 		if name, _ := entry["name"].(string); strings.TrimSpace(name) == "" {
@@ -286,7 +327,7 @@ func rewriteComposerVersion(entry map[string]any, domain string, packageName str
 	reference, _ := distVal["reference"].(string)
 	distType, _ := distVal["type"].(string)
 	if packageName != "" && domain != "" && reference != "" && distType != "" {
-		registerComposerDist(domain, packageName, reference, distType, urlValue)
+		composerDists.remember(domain, packageName, reference, distType, urlValue)
 	}
 	rewritten := rewriteComposerLegacyDistURL(urlValue, domain)
 	if rewritten == urlValue {
@@ -395,45 +436,64 @@ func parseComposerDistURL(path string, rawQuery string) (*url.URL, bool) {
 	return target, true
 }
 
-func stripPackagistHost(raw string) string {
-	raw = strings.TrimSpace(raw)
-	raw = strings.ReplaceAll(raw, "https://repo.packagist.org", "")
-	raw = strings.ReplaceAll(raw, "http://repo.packagist.org", "")
-	return raw
-}
-
 func isPackagistHost(host string) bool {
 	return strings.EqualFold(host, "repo.packagist.org")
 }
 
-func buildComposerProxyURL(raw string, domain string) string {
-	trimmed := stripPackagistHost(strings.TrimSpace(raw))
-	if trimmed == "" {
-		return trimmed
+func stripPackagistPrefix(raw string) (string, bool) {
+	for _, prefix := range []string{
+		"https://repo.packagist.org",
+		"http://repo.packagist.org",
+	} {
+		if strings.HasPrefix(raw, prefix) {
+			trimmed := strings.TrimPrefix(raw, prefix)
+			if trimmed == "" {
+				return "/", true
+			}
+			if !strings.HasPrefix(trimmed, "/") {
+				trimmed = "/" + trimmed
+			}
+			return trimmed, true
+		}
 	}
-	if parsed, err := url.Parse(trimmed); err == nil && parsed.Host != "" {
-		if domain != "" && strings.EqualFold(parsed.Host, domain) {
-			return trimmed
-		}
-		if !isPackagistHost(parsed.Host) {
-			return trimmed
-		}
-		if path := parsed.EscapedPath(); path != "" {
-			trimmed = path
+	return "", false
+}
+
+func buildComposerProxyURL(raw string, domain string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+	if strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://") {
+		parsed, err := url.Parse(value)
+		switch {
+		case err != nil:
+			if trimmed, ok := stripPackagistPrefix(value); ok {
+				value = trimmed
+			} else {
+				return value
+			}
+		case domain != "" && strings.EqualFold(parsed.Host, domain):
+			return value
+		case !isPackagistHost(parsed.Host):
+			return value
+		default:
+			value = parsed.EscapedPath()
+			if value == "" {
+				value = "/"
+			}
 			if parsed.RawQuery != "" {
-				trimmed = trimmed + "?" + parsed.RawQuery
+				value += "?" + parsed.RawQuery
 			}
 		}
 	}
-
-	if !strings.HasPrefix(trimmed, "/") {
-		trimmed = "/" + trimmed
-	}
+	pathOnly, query := splitPathAndQuery(value)
+	pathOnly = ensureLeadingSlash(pathOnly)
 
 	if domain == "" {
-		return trimmed
+		return pathOnly + query
 	}
-	return "https://" + domain + trimmed
+	return "https://" + domain + pathOnly + query
 }
 
 func resolveComposerMirrorDist(domain string, locator string) string {
@@ -445,7 +505,7 @@ func resolveComposerMirrorDist(domain string, locator string) string {
 	if !ok {
 		return ""
 	}
-	target, ok := lookupComposerDist(domain, pkg, reference, distType)
+	target, ok := composerDists.lookup(domain, pkg, reference, distType)
 	if !ok {
 		return ""
 	}
@@ -483,30 +543,6 @@ func parseComposerMirrorDistLocator(locator string) (string, string, string, boo
 	return packageName, reference, distType, true
 }
 
-func registerComposerDist(domain string, packageName string, reference string, distType string, upstream string) {
-	key := composerDistKey(domain, packageName, reference, distType)
-	if key == "" || strings.TrimSpace(upstream) == "" {
-		return
-	}
-	composerDistRegistry.Store(key, upstream)
-}
-
-func lookupComposerDist(domain string, packageName string, reference string, distType string) (string, bool) {
-	key := composerDistKey(domain, packageName, reference, distType)
-	if key == "" {
-		return "", false
-	}
-	value, ok := composerDistRegistry.Load(key)
-	if !ok {
-		return "", false
-	}
-	str, _ := value.(string)
-	if strings.TrimSpace(str) == "" {
-		return "", false
-	}
-	return str, true
-}
-
 func composerDistKey(domain string, packageName string, reference string, distType string) string {
 	domain = strings.ToLower(strings.TrimSpace(domain))
 	pkg := strings.ToLower(strings.TrimSpace(packageName))
@@ -519,18 +555,27 @@ func composerDistKey(domain string, packageName string, reference string, distTy
 }
 
 func trimComposerNamespace(p string) string {
-	if strings.HasPrefix(p, "/composer/") {
-		return strings.TrimPrefix(p, "/composer")
-	}
-	if p == "/composer" {
-		return "/"
-	}
-	return p
+	return ensureLeadingSlash(p)
 }
 
 func resetComposerDistRegistry() {
-	composerDistRegistry.Range(func(key, _ any) bool {
-		composerDistRegistry.Delete(key)
-		return true
-	})
+	composerDists.reset()
+}
+
+func splitPathAndQuery(raw string) (string, string) {
+	if idx := strings.IndexByte(raw, '?'); idx >= 0 {
+		return raw[:idx], raw[idx:]
+	}
+	return raw, ""
+}
+
+func ensureLeadingSlash(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return path.Clean(p)
 }

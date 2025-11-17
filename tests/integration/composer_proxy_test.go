@@ -98,7 +98,7 @@ func TestComposerProxyCachesMetadataAndDists(t *testing.T) {
 		t.Fatalf("expected mirrors entry in packages root")
 	} else {
 		if entry, ok := mirrors[0].(map[string]any); ok {
-			if distURL, _ := entry["dist-url"].(string); distURL != "https://composer.hub.local/composer/dists/%package%/%reference%.%type%" {
+			if distURL, _ := entry["dist-url"].(string); distURL != "https://composer.hub.local/dists/%package%/%reference%.%type%" {
 				t.Fatalf("unexpected mirrors dist-url: %s", distURL)
 			}
 			if preferred, _ := entry["preferred"].(bool); !preferred {
@@ -109,7 +109,7 @@ func TestComposerProxyCachesMetadataAndDists(t *testing.T) {
 		}
 	}
 
-	metaPath := "/composer/p2/example/package.json"
+	metaPath := "/p2/example/package.json"
 	resp := doRequest(metaPath)
 	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("expected 200 for composer metadata, got %d", resp.StatusCode)
