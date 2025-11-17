@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -31,6 +32,7 @@ type Handler struct {
 	client *http.Client
 	logger *logrus.Logger
 	store  cache.Store
+	etags  sync.Map // key: hub+path, value: etag/digest string
 }
 
 // NewHandler constructs a proxy handler with shared HTTP client/logger/store.
@@ -267,6 +269,7 @@ func (h *Handler) cacheAndStream(
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadGateway, fmt.Sprintf("cache_write_failed: %v", err))
 	}
+	h.rememberETag(route, locator, resp)
 	_ = entry
 	return nil
 }
@@ -706,19 +709,37 @@ func (h *Handler) isCacheFresh(
 	}
 
 	upstreamURL := resolveUpstreamURL(route, route.UpstreamURL, c)
-	req, err := h.buildUpstreamRequest(c, upstreamURL, route, http.MethodHead, http.NoBody, "")
+	resp, err := h.revalidateRequest(c, route, upstreamURL, locator, "")
 	if err != nil {
 		return false, err
 	}
 
-	resp, err := h.doRequest(req, route)
-	if err != nil {
-		return false, err
+	if shouldRetryAuth(route, resp.StatusCode) {
+		challenge, ok := parseBearerChallenge(resp.Header.Values("Www-Authenticate"))
+		resp.Body.Close()
+
+		authHeader := ""
+		if ok {
+			token, err := h.fetchBearerToken(ctx, challenge, route)
+			if err != nil {
+				return false, err
+			}
+			authHeader = "Bearer " + token
+		}
+
+		resp, err = h.revalidateRequest(c, route, upstreamURL, locator, authHeader)
+		if err != nil {
+			return false, err
+		}
 	}
+
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
+	case http.StatusNotModified:
+		return true, nil
 	case http.StatusOK:
+		h.rememberETag(route, locator, resp)
 		remote := extractModTime(resp.Header)
 		if !remote.After(entry.ModTime.Add(time.Second)) {
 			return true, nil
@@ -728,10 +749,28 @@ func (h *Handler) isCacheFresh(
 		if h.store != nil {
 			_ = h.store.Remove(ctx, locator)
 		}
+		h.forgetETag(route, locator)
 		return false, nil
 	default:
 		return false, nil
 	}
+}
+
+func (h *Handler) revalidateRequest(
+	c fiber.Ctx,
+	route *server.HubRoute,
+	upstreamURL *url.URL,
+	locator cache.Locator,
+	overrideAuth string,
+) (*http.Response, error) {
+	req, err := h.buildUpstreamRequest(c, upstreamURL, route, http.MethodHead, http.NoBody, overrideAuth)
+	if err != nil {
+		return nil, err
+	}
+	if etag := h.cachedETag(route, locator); etag != "" {
+		req.Header.Set("If-None-Match", etag)
+	}
+	return h.doRequest(req, route)
 }
 
 func extractModTime(header http.Header) time.Time {
@@ -982,6 +1021,50 @@ func (h *Handler) logAuthFailure(route *server.HubRoute, upstream string, reques
 		fields["request_id"] = requestID
 	}
 	h.logger.WithFields(fields).Error("proxy_auth_failed")
+}
+
+func (h *Handler) rememberETag(route *server.HubRoute, locator cache.Locator, resp *http.Response) {
+	if resp == nil {
+		return
+	}
+	etag := resp.Header.Get("Docker-Content-Digest")
+	if etag == "" {
+		etag = resp.Header.Get("Etag")
+	}
+	etag = normalizeETag(etag)
+	if etag == "" {
+		return
+	}
+	h.etags.Store(h.locatorKey(route, locator), etag)
+}
+
+func (h *Handler) cachedETag(route *server.HubRoute, locator cache.Locator) string {
+	if value, ok := h.etags.Load(h.locatorKey(route, locator)); ok {
+		if etag, ok := value.(string); ok {
+			return etag
+		}
+	}
+	return ""
+}
+
+func (h *Handler) forgetETag(route *server.HubRoute, locator cache.Locator) {
+	h.etags.Delete(h.locatorKey(route, locator))
+}
+
+func (h *Handler) locatorKey(route *server.HubRoute, locator cache.Locator) string {
+	hub := locator.HubName
+	if route != nil && route.Config.Name != "" {
+		hub = route.Config.Name
+	}
+	return hub + "::" + locator.Path
+}
+
+func normalizeETag(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	return strings.Trim(value, "\"")
 }
 
 func ensureProxyHubType(route *server.HubRoute) error {

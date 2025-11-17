@@ -164,6 +164,50 @@ func TestDockerProxyHandlesBearerTokenExchange(t *testing.T) {
 	}
 }
 
+func TestDockerProxyCachesAfterBearerRevalidation(t *testing.T) {
+	stub := newDockerBearerStub(t, "ci-user", "ci-pass")
+	defer stub.Close()
+
+	app := newDockerProxyApp(t, stub)
+
+	req := httptest.NewRequest("GET", "http://docker.hub.local/v2/library/alpine/manifests/latest", nil)
+	req.Host = "docker.hub.local"
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200 after token exchange, got %d (body=%s)", resp.StatusCode, string(body))
+	}
+	if resp.Header.Get("X-Any-Hub-Cache-Hit") != "false" {
+		t.Fatalf("expected first request to miss cache")
+	}
+	resp.Body.Close()
+
+	req2 := httptest.NewRequest("GET", "http://docker.hub.local/v2/library/alpine/manifests/latest", nil)
+	req2.Host = "docker.hub.local"
+	resp2, err := app.Test(req2)
+	if err != nil {
+		t.Fatalf("app.Test failed: %v", err)
+	}
+	if resp2.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp2.Body)
+		t.Fatalf("expected 200 after cache revalidation, got %d (body=%s)", resp2.StatusCode, string(body))
+	}
+	if resp2.Header.Get("X-Any-Hub-Cache-Hit") != "true" {
+		t.Fatalf("expected second request to be served from cache")
+	}
+	resp2.Body.Close()
+
+	if hits := stub.ManifestHits(); hits != 4 {
+		t.Fatalf("expected 4 manifest hits (2 GET + 2 HEAD), got %d", hits)
+	}
+	if tokens := stub.TokenHits(); tokens != 2 {
+		t.Fatalf("expected token endpoint to be called twice, got %d", tokens)
+	}
+}
+
 func performCredentialRequest(t *testing.T, app *fiber.App) *http.Response {
 	t.Helper()
 	req := httptest.NewRequest("GET", "http://secure.hub.local/private/data", nil)
@@ -427,6 +471,7 @@ type dockerBearerStub struct {
 	tokenAuth    string
 	manifestHits int
 	tokenHits    int
+	lastModified time.Time
 }
 
 func newDockerBearerStub(t *testing.T, username, password string) *dockerBearerStub {
@@ -436,6 +481,7 @@ func newDockerBearerStub(t *testing.T, username, password string) *dockerBearerS
 		password:      password,
 		expectedBasic: "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password))),
 		tokenValue:    "test-token",
+		lastModified:  time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC),
 	}
 
 	mux := http.NewServeMux()
@@ -470,7 +516,11 @@ func (s *dockerBearerStub) handleManifest(w http.ResponseWriter, r *http.Request
 
 	if success {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Last-Modified", s.lastModified.Format(http.TimeFormat))
 		w.WriteHeader(http.StatusOK)
+		if r.Method == http.MethodHead {
+			return
+		}
 		_, _ = w.Write([]byte(`{"schemaVersion":2}`))
 		return
 	}
