@@ -61,7 +61,7 @@ func contentType(_ *hooks.RequestContext, locatorPath string) string {
 	case strings.HasSuffix(clean, "release.gpg"):
 		return "application/pgp-signature"
 	case strings.Contains(clean, "/dists/") &&
-		(strings.HasSuffix(clean, "/release") || strings.HasSuffix(clean, "/inrelease")):
+		(strings.HasSuffix(clean, "/release") || strings.HasSuffix(clean, "/inrelease") || strings.HasSuffix(clean, "/release.gpg")):
 		return "text/plain"
 	default:
 		return ""
