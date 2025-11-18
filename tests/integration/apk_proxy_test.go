@@ -41,7 +41,6 @@ func TestAPKProxyCachesIndexAndPackages(t *testing.T) {
 				Name:     "apk",
 				Domain:   "apk.hub.local",
 				Type:     "apk",
-				Module:   "apk",
 				Upstream: stub.URL,
 			},
 		},

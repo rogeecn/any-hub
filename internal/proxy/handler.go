@@ -66,7 +66,6 @@ func buildHookContext(route *server.HubRoute, c fiber.Ctx) *hooks.RequestContext
 		Domain:       route.Config.Domain,
 		HubType:      route.Config.Type,
 		ModuleKey:    route.ModuleKey,
-		RolloutFlag:  string(route.RolloutFlag),
 		UpstreamHost: baseHost,
 		Method:       c.Method(),
 	}
@@ -519,9 +518,7 @@ func (h *Handler) logResult(
 		route.Config.Type,
 		route.Config.AuthMode(),
 		route.ModuleKey,
-		string(route.RolloutFlag),
 		cacheHit,
-		route.ModuleKey == hubmodule.DefaultModuleKey(),
 	)
 	fields["action"] = "proxy"
 	fields["upstream"] = upstream
@@ -972,9 +969,7 @@ func (h *Handler) logAuthRetry(route *server.HubRoute, upstream string, requestI
 		route.Config.Type,
 		route.Config.AuthMode(),
 		route.ModuleKey,
-		string(route.RolloutFlag),
 		false,
-		route.ModuleKey == hubmodule.DefaultModuleKey(),
 	)
 	fields["action"] = "proxy_retry"
 	fields["upstream"] = upstream
@@ -993,9 +988,7 @@ func (h *Handler) logAuthFailure(route *server.HubRoute, upstream string, reques
 		route.Config.Type,
 		route.Config.AuthMode(),
 		route.ModuleKey,
-		string(route.RolloutFlag),
 		false,
-		route.ModuleKey == hubmodule.DefaultModuleKey(),
 	)
 	fields["action"] = "proxy"
 	fields["upstream"] = upstream

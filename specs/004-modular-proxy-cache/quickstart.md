@@ -12,20 +12,20 @@
 4. Add tests under the module directory and run `make modules-test` (delegates to `go test ./internal/hubmodule/...`).
 
 ## 3. Bind Module via Config
-1. Edit `config.toml` and set `Module = "<module-key>"` inside the target `[[Hub]]` block (omit to use `legacy`).
-2. While validating a new module, set `Rollout = "dual"` so you can flip back to legacy without editing other fields.
+1. Add your module type to `internal/config/validation.go` and the sample config if it represents a new protocol.
+2. Edit `config.toml` and set `Type = "<module-type>"` inside the target `[[Hub]]` block.
 3. (Optional) Override cache behavior per hub using existing fields (`CacheTTL`, etc.).
 4. Run `ANY_HUB_CONFIG=./config.toml go test ./...` (or `make modules-test`) to ensure loader validation passes and the module registry sees your key.
 
 ## 4. Run and Verify
 1. Start the binary: `go run ./cmd/any-hub --config ./config.toml`.
-2. Use `curl -H "Host: <hub-domain>" http://127.0.0.1:<port>/<path>` to produce traffic, then hit `curl http://127.0.0.1:<port>/-/modules` and confirm the hub binding points to your module with the expected `rollout_flag`.
+2. Use `curl -H "Host: <hub-domain>" http://127.0.0.1:<port>/<path>` to produce traffic, then hit `curl http://127.0.0.1:<port>/-/modules` and confirm the hub binding points to your module key.
 3. Inspect `./storage/<hub>/` to confirm the cached files mirror the upstream path (no suffix). When a path also has child entries (e.g., `/pkg` metadata plus `/pkg/-/...` tarballs), the metadata payload is stored in a `__content` file under that directory so both artifacts can coexist. PyPI Simple responses rewrite distribution links to `/files/<scheme>/<host>/<path>` so that wheels/tarballs are fetched through the proxy and cached alongside the HTML/JSON index. Verify TTL overrides are propagated.
-4. Monitor `logs/any-hub.log` (or the sample `logs/module_migration_sample.log`) to verify each entry exposes `module_key` + `rollout_flag`. Example:
+4. Monitor `logs/any-hub.log` (or the sample `logs/module_migration_sample.log`) to verify each entry exposes `module_key`. Example:
    ```json
-   {"action":"proxy","hub":"testhub","module_key":"testhub","rollout_flag":"dual","cache_hit":false,"upstream_status":200}
+   {"action":"proxy","hub":"testhub","module_key":"testhub","cache_hit":false,"upstream_status":200}
    ```
-5. Exercise rollback by switching `Rollout = "legacy-only"` (or `Module = "legacy"` if needed) and re-running the traffic to ensure diagnostics/logs show the transition.
+5. Exercise rollback by reverting the config change (or type rename) and re-running the traffic to ensure diagnostics/logs show the transition.
 
 ## 5. Ship
 1. Commit module code + config docs.

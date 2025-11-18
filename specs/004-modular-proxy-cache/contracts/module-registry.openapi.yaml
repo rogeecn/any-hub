@@ -94,6 +94,3 @@ components:
           type: string
         port:
           type: integer
-        rollout_flag:
-          type: string
-          enum: [legacy-only, dual, modular]

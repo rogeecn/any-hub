@@ -13,7 +13,6 @@ type RequestContext struct {
 	Domain       string
 	HubType      string
 	ModuleKey    string
-	RolloutFlag  string
 	UpstreamHost string
 	Method       string
 }

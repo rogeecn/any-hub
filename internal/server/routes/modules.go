@@ -65,8 +65,6 @@ type hubBindingPayload struct {
 	ModuleKey string `json:"module_key"`
 	Domain    string `json:"domain"`
 	Port      int    `json:"port"`
-	Rollout   string `json:"rollout_flag"`
-	Legacy    bool   `json:"legacy_only"`
 }
 
 func encodeModules(mods []hubmodule.ModuleMetadata, status map[string]string) []modulePayload {
@@ -118,8 +116,6 @@ func encodeHubBindings(routes []server.HubRoute) []hubBindingPayload {
 			ModuleKey: route.ModuleKey,
 			Domain:    route.Config.Domain,
 			Port:      route.ListenPort,
-			Rollout:   string(route.RolloutFlag),
-			Legacy:    route.ModuleKey == hubmodule.DefaultModuleKey(),
 		})
 	}
 	return result

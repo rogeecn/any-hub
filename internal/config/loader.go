@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -89,25 +88,12 @@ func applyHubDefaults(h *HubConfig) {
 	if h.CacheTTL.DurationValue() < 0 {
 		h.CacheTTL = Duration(0)
 	}
-	if trimmed := strings.TrimSpace(h.Module); trimmed == "" {
-		typeKey := strings.ToLower(strings.TrimSpace(h.Type))
-		if meta, ok := hubmodule.Resolve(typeKey); ok {
-			h.Module = meta.Key
-		} else {
-			h.Module = hubmodule.DefaultModuleKey()
-		}
-	} else {
-		h.Module = strings.ToLower(trimmed)
-	}
-	if rollout := strings.TrimSpace(h.Rollout); rollout != "" {
-		h.Rollout = strings.ToLower(rollout)
-	}
 	if h.ValidationMode == "" {
 		h.ValidationMode = string(hubmodule.ValidationModeETag)
 	}
 }
 
-// NormalizeHubConfig 公开给无需依赖 loader 的调用方（例如测试）以填充模块/rollout 默认值。
+// NormalizeHubConfig 公开给无需依赖 loader 的调用方（例如测试）以应用 TTL/校验默认值。
 func NormalizeHubConfig(h HubConfig) HubConfig {
 	applyHubDefaults(&h)
 	return h

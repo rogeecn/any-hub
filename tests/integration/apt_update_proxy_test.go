@@ -36,7 +36,6 @@ func TestAptUpdateCachesIndexes(t *testing.T) {
 				Name:     "apt",
 				Domain:   "apt.hub.local",
 				Type:     "debian",
-				Module:   "debian",
 				Upstream: stub.URL,
 			},
 		},

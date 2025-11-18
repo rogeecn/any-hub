@@ -19,7 +19,6 @@ Name = "docker"
 Upstream = "https://registry-1.docker.io"
 Proxy = ""
 Type = "docker"
-Module = "docker"
 Username = ""
 Password = ""
 
@@ -29,7 +28,6 @@ Name = "ghcr"
 Upstream = "https://ghcr.io"
 Proxy = ""
 Type = "docker"
-Module = "docker"
 Username = ""
 Password = ""
 
@@ -39,7 +37,6 @@ Name = "quay"
 Upstream = "https://quay.io"
 Proxy = ""
 Type = "docker"
-Module = "docker"
 Username = ""
 Password = ""
 
@@ -50,7 +47,6 @@ Name = "go"
 Upstream = "https://proxy.golang.org"
 Proxy = ""
 Type = "go"
-Module = "go"
 Username = ""
 Password = ""
 
@@ -61,7 +57,6 @@ Name = "npm"
 Upstream = "https://registry.npmjs.org"
 Proxy = ""
 Type = "npm"
-Module = "npm"
 Username = ""
 Password = ""
 
@@ -74,7 +69,6 @@ Proxy = ""
 Username = ""
 Password = ""
 Type = "pypi"
-Module = "pypi"
 
 # Composer Repository
 [[Hub]]
@@ -85,7 +79,6 @@ Proxy = ""
 Username = ""
 Password = ""
 Type = "composer"
-Module = "composer"
 
 # Debian/Ubuntu APT 示例
 [[Hub]]
@@ -93,8 +86,6 @@ Name = "apt-cache"
 Domain = "apt.hub.local"
 Upstream = "https://mirrors.edge.kernel.org/ubuntu"
 Type = "debian"
-Module = "debian"
-Rollout = "modular"
 
 # Alpine APK 示例
 [[Hub]]
@@ -102,5 +93,3 @@ Name = "apk-cache"
 Domain = "apk.hub.local"
 Upstream = "https://dl-cdn.alpinelinux.org/alpine"
 Type = "apk"
-Module = "apk"
-Rollout = "modular"

@@ -38,7 +38,7 @@ Password = "s3cr3t"
 
 1. 复制 `configs/config.example.toml` 为工作目录下的 `config.toml` 并调整 `[[Hub]]` 配置：
    - 在全局段添加/修改 `ListenPort`，并从每个 Hub 中移除 `Port`。
-   - 为 Hub 填写 `Type`，并按需添加 `Module`（缺省为 `legacy`，自定义模块需在 `internal/hubmodule/<module-key>/` 注册）。
+   - 为 Hub 填写 `Type`，any-hub 会根据类型挑选对应模块 Hook；如需扩展模块需在 `internal/hubmodule/<type>/` 注册并将新的类型纳入配置校验。
    - 根据 quickstart 示例设置 `Domain`、`Upstream`、`StoragePath` 等字段，并按需添加 `Username`/`Password`。
 2. 参考 [`specs/003-hub-auth-fields/quickstart.md`](specs/003-hub-auth-fields/quickstart.md) 完成配置校验、凭证验证与日志检查。
 3. 常用命令：
@@ -48,20 +48,20 @@ Password = "s3cr3t"
 
 ## 模块化代理与示例
 
-- `configs/config.example.toml` 展示了多个 Hub 的组合：Docker Hub（省略 `Module`，自动使用 `Type` 同名 Hook）、Composer Hub（显式指定 `Module = "composer"`）以及 legacy 兜底 Hub，可直接复制修改。
-- 运行 `./scripts/demo-proxy.sh docker`（或 `npm`）即可加载示例配置并启动代理，日志中会附带 `module_key` 字段，便于确认命中的是 `legacy` 还是自定义模块。
+- `configs/config.example.toml` 展示了多个 Hub 的组合：Docker/NPM/Composer 等类型均自动绑定同名模块，仅需设置 `Type` 与上游信息即可启动。
+- 运行 `./scripts/demo-proxy.sh docker`（或 `npm`）即可加载示例配置并启动代理，日志中会附带 `module_key` 字段，便于确认命中的是 `docker`、`npm` 等模块。
 - Hook 开发流程：
   1. 复制 `internal/hubmodule/template/` 至 `internal/hubmodule/<module-key>/`，补全 `module.go` 与 `module_test.go`。
   2. 在模块 `init()` 中调用 `hubmodule.MustRegister` 注册 metadata，并使用 `hooks.MustRegister` 注册 Hook（NormalizePath/ResolveUpstream/RewriteResponse 等）。
   3. 为模块补充单元测试、`tests/integration/` 覆盖 miss→hit 流程，运行 `make modules-test`/`go test ./...`。
-  4. 更新配置：若 `[[Hub]].Module` 留空，将根据 `Type` 自动选择 Hook；也可显式设置 `Module = "<module-key>"` 并通过 `Rollout` 控制 legacy/dual/modular。
+  4. 更新配置：为新的模块挑选一个唯一的 `Type` 值（需要同步到配置校验列表），Hub 只需填写该 `Type` 即可路由至新模块。
   5. 启动服务前，可通过 `curl -s /-/modules | jq '.hook_registry'` 确认 hook 注册情况；缺失时启动会直接失败，避免运行期回退到 legacy。
 
-### 模块选择与 legacy
-- `[[Hub]].Module` 为空时会自动回退到与 `Type` 同名的模块（若已注册），否则使用 `legacy` 兜底。
-- diagnostics `/-/modules` 将展示 `hook_status`，当模块仍使用 legacy 时会标记 `legacy-only`，便于排查。
-- legacy 模块仅提供最小兜底能力，迁移完成后应显式将 `Module` 设置为对应仓库的 Hook。
-- 示例操作手册、常见问题参见 [`specs/003-hub-auth-fields/quickstart.md`](specs/003-hub-auth-fields/quickstart.md) 以及本特性的 [`quickstart.md`](specs/004-modular-proxy-cache/quickstart.md)。
+### 模块选择
+
+- Hub 的 `Type` 直接映射到同名模块；新增模块时需同步扩展 `internal/config/validation.go` 中的支持列表。
+- diagnostics `/-/modules` 仍会展示每个模块的 hook 注册状态与所有 Hub 绑定关系，便于排查配置错误。
+- legacy 模块仅作为历史兼容存在，不再通过配置字段触发。
 
 ## CLI 标志
 

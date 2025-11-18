@@ -11,7 +11,6 @@ import (
 
 	"github.com/any-hub/any-hub/internal/config"
 	"github.com/any-hub/any-hub/internal/hubmodule"
-	"github.com/any-hub/any-hub/internal/hubmodule/legacy"
 )
 
 // HubRoute 将 Hub 配置与派生属性（如缓存 TTL、解析后的 Upstream/Proxy URL）
@@ -31,8 +30,6 @@ type HubRoute struct {
 	Module    hubmodule.ModuleMetadata
 	// CacheStrategy 代表模块默认策略与 hub 覆盖后的最终结果。
 	CacheStrategy hubmodule.CacheStrategyProfile
-	// RolloutFlag 反映当前 hub 的 legacy → modular 迁移状态，供日志/诊断使用。
-	RolloutFlag legacy.RolloutFlag
 }
 
 // HubRegistry 提供 Host/Host:port 到 HubRoute 的查询能力，所有 Hub 共享同一个监听端口。
@@ -106,9 +103,11 @@ func (r *HubRegistry) List() []HubRoute {
 }
 
 func buildHubRoute(cfg *config.Config, hub config.HubConfig) (*HubRoute, error) {
-	flag := hub.RolloutFlagValue()
-	effectiveKey := config.EffectiveModuleKey(hub.Module, flag)
-	meta, err := moduleMetadataForKey(effectiveKey)
+	moduleKey := strings.ToLower(strings.TrimSpace(hub.Type))
+	if moduleKey == "" {
+		return nil, fmt.Errorf("hub %s: 缺少 Type", hub.Name)
+	}
+	meta, err := moduleMetadataForKey(moduleKey)
 	if err != nil {
 		return nil, fmt.Errorf("hub %s: %w", hub.Name, err)
 	}
@@ -127,8 +126,7 @@ func buildHubRoute(cfg *config.Config, hub config.HubConfig) (*HubRoute, error) 
 	}
 
 	effectiveTTL := cfg.EffectiveCacheTTL(hub)
-	runtime := config.BuildHubRuntime(hub, meta, effectiveTTL, flag)
-	legacy.RecordAdapterState(hub.Name, runtime.Module.Key, flag)
+	runtime := config.BuildHubRuntime(hub, meta, effectiveTTL)
 
 	return &HubRoute{
 		Config:        hub,
@@ -139,7 +137,6 @@ func buildHubRoute(cfg *config.Config, hub config.HubConfig) (*HubRoute, error) 
 		ModuleKey:     runtime.Module.Key,
 		Module:        runtime.Module,
 		CacheStrategy: runtime.CacheStrategy,
-		RolloutFlag:   runtime.Rollout,
 	}, nil
 }
 

@@ -79,23 +79,9 @@ func (c *Config) Validate() error {
 		}
 		hub.Type = normalizedType
 
-		moduleKey := strings.ToLower(strings.TrimSpace(hub.Module))
-		if moduleKey == "" {
-			if _, ok := hubmodule.Resolve(normalizedType); ok && normalizedType != "" {
-				moduleKey = normalizedType
-			} else {
-				moduleKey = hubmodule.DefaultModuleKey()
-			}
+		if _, ok := hubmodule.Resolve(normalizedType); !ok {
+			return newFieldError(hubField(hub.Name, "Type"), fmt.Sprintf("未注册模块: %s", normalizedType))
 		}
-		if _, ok := hubmodule.Resolve(moduleKey); !ok {
-			return newFieldError(hubField(hub.Name, "Module"), fmt.Sprintf("未注册模块: %s", moduleKey))
-		}
-		hub.Module = moduleKey
-		flag, err := parseRolloutFlag(hub.Rollout, hub.Module)
-		if err != nil {
-			return newFieldError(hubField(hub.Name, "Rollout"), err.Error())
-		}
-		hub.Rollout = string(flag)
 		if hub.ValidationMode != "" {
 			mode := strings.ToLower(strings.TrimSpace(hub.ValidationMode))
 			switch mode {

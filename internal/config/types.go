@@ -69,8 +69,6 @@ type HubConfig struct {
 	Upstream        string   `mapstructure:"Upstream"`
 	Proxy           string   `mapstructure:"Proxy"`
 	Type            string   `mapstructure:"Type"`
-	Module          string   `mapstructure:"Module"`
-	Rollout         string   `mapstructure:"Rollout"`
 	Username        string   `mapstructure:"Username"`
 	Password        string   `mapstructure:"Password"`
 	CacheTTL        Duration `mapstructure:"CacheTTL"`

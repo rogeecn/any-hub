@@ -40,5 +40,5 @@ curl -s http://localhost:8080/-/modules | jq '.modules[].hook_status'
 ```
 - 确认新模块标记为 `registered`，未注册模块显示 `missing`，legacy handler 仍可作为兜底。
 - 如果需要查看全局状态，可检查 `hook_registry` 字段，它返回每个 module_key 的注册情况。
-- `hubs[].legacy_only` 为 `true` 时表示该 Hub 仍绑定 legacy 模块；迁移完成后应显式设置 `[[Hub]].Module`。
+- `hubs[].module_key` 应与配置中的 `Type` 对齐；legacy 模块仅作为兜底存在，推荐尽快替换为协议专用模块。
 - 启动阶段会验证每个模块是否注册 Hook，缺失则直接退出，避免运行期静默回退。

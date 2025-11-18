@@ -21,7 +21,7 @@ Modularize the proxy and cache layers so every hub type (npm, Docker, PyPI, futu
 **Constraints**: 禁止 Web UI 或账号体系；所有行为受单一 TOML 配置控制；每个 Hub 需独立 Domain/Port 绑定；仅匿名访问  
 **Scale/Scope**: 支撑 Docker/NPM/Go/PyPI 等多仓代理，面向弱网及离线缓存复用场景  
 **Module Registry Location**: `internal/hubmodule/registry.go` 暴露注册/解析 API，模块子目录位于 `internal/hubmodule/<name>/`  
-**Config Binding for Modules**: `[[Hub]].Module` 字段控制模块名，默认 `legacy`，配置加载阶段校验必须命中已注册模块
+**Config Binding for Modules**: `[[Hub]].Type` 字段控制模块名（同名映射），配置加载阶段需校验类型对应的模块已注册
 
 ## Constitution Check
 
@@ -29,7 +29,7 @@ Modularize the proxy and cache layers so every hub type (npm, Docker, PyPI, futu
 
 - Feature 仍然是“轻量多仓 CLI 代理”，未引入 Web UI、账号体系或与代理无关的能力。
 - 仅使用 Go + 宪法指定依赖；任何新第三方库都已在本计划中说明理由与审核结论。
-- 行为完全由 `config.toml` 控制，新增 `[[Hub]].Module` 配置项已规划默认值、校验与迁移策略。
+- 行为完全由 `config.toml` 控制，`[[Hub]].Type` 直接驱动模块绑定，校验列表随模块扩展更新。
 - 方案维持缓存优先 + 流式回源路径，并给出命中/回源/失败的日志与观测手段。
 - 计划内列出了配置解析、缓存读写、Host Header 路由等强制测试与中文注释交付范围。
 
@@ -103,14 +103,14 @@ tests/                     # `go test` 下的单元/集成测试，用临时目�
 ### Post-Design Constitution Check
 - New diagnostics endpoint remains internal and optional; no UI/login introduced. ✅ Principle I
 - Code still single Go binary with existing dependency set. ✅ Principle II
-- `Module` field documented with defaults, validation, and migration path; no extra config sources. ✅ Principle III
+- `Type` 字段即模块绑定点，文档与校验同步更新；无额外配置源。 ✅ Principle III
 - Cache strategy enforces“原始路径 == 磁盘路径”的布局与流式回源，相关观测需求写入 contracts。✅ Principle IV
 - Logs/quickstart/test guidance ensure observability and Chinese documentation continue. ✅ Principle V
 
 ## Phase 2 – Implementation Outlook (pre-tasks)
 
 1. **Module Registry & Interfaces**: Create `internal/hubmodule` package, define shared interfaces, implement registry with tests, and expose diagnostics data source reused by HTTP endpoints.
-2. **Config Loader & Validation**: Extend `internal/config/types.go` and `validation.go` to include `Module` with default `legacy`, plus wiring to registry resolution during startup.
+2. **Config Loader & Validation**: Extend `internal/config/types.go` and `validation.go` to bind modules via `Type`, plus wiring to registry resolution during startup.
 3. **Legacy Adapter & Migration Switches**: Provide adapter module that wraps current shared proxy/cache, plus feature flags or config toggles to control rollout states per hub.
 4. **Module Implementations**: Carve existing npm/docker/pypi logic into dedicated modules within `internal/hubmodule/`, ensuring cache writer复用原始请求路径与必要的 telemetry 标签。
 5. **Observability/Diagnostics**: Implement `/−/modules` endpoint (Fiber route) and log tags showing `module_key` on cache/proxy events.

@@ -88,10 +88,6 @@ func isAptImmutablePath(p string) bool {
 
 func isByHashPath(p string) bool {
 	clean := canonicalPath(p)
-	if strings.Contains(clean, "/dists/") {
-		return false
-	}
-
 	return strings.Contains(clean, "/by-hash/")
 }
 

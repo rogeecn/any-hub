@@ -13,13 +13,12 @@ The modular architecture introduces explicit metadata describing which proxy+cac
   - `Domain` *(string, required)* – hostname clients access; must be unique per process.
   - `Port` *(int, required)* – listen port; validated to 1–65535.
   - `Upstream` *(string, required)* – base URL for upstream registry; must be HTTPS or explicitly whitelisted HTTP.
-  - `Module` *(string, optional, default `"legacy"`)* – key resolved through module registry. Validation ensures module exists at load time.
+  - `Type` *(string, required)* – module selector; validated against the registered module set.
   - `CacheTTL`, `Proxy`, and other overrides *(optional)* – reuse existing schema; modules may read these via dependency injection.
 - **Relationships**:
-  - `HubConfigEntry.Module` → `ModuleMetadata.Key` (many-to-one).
+  - `HubConfigEntry.Type` → `ModuleMetadata.Key` (many-to-one).
 - **Validation Rules**:
-  - Missing `Module` implicitly maps to `legacy` to preserve backward compatibility.
-  - Changing `Module` requires a migration plan; config loader logs module name for observability.
+  - Invalid `Type` values reject config load; operators must add the type to the supported list alongside module registration.
 
 ### 2. ModuleMetadata
 - **Fields**:
@@ -57,20 +56,12 @@ The modular architecture introduces explicit metadata describing which proxy+cac
   - TTL must be positive.
   - Modules flagged as `SupportsStreamingWrite=false` must document fallback behavior before registration.
 
-### 5. LegacyAdapterState
-- **Purpose**: Tracks which hubs still run through the old shared implementation to support progressive migration.
-- **Fields**:
-  - `HubName` *(string)* – references `HubConfigEntry.Name`.
-  - ` rolloutFlag` *(enum: `legacy-only`, `dual`, `modular`)* – indicates traffic split for that hub.
-  - `FallbackDeadline` *(timestamp, optional)* – when legacy path will be removed.
-- **Storage**: In-memory map derived from config + environment flags; optionally surfaced via diagnostics endpoint.
-
 ## State Transitions
 
 1. **Module Adoption**
-   - Start: `HubConfigEntry.Module = "legacy"`.
-   - Transition: operator edits config to new module key, runs validation.
-   - Result: registry resolves new module, `LegacyAdapterState` updated to `dual` until rollout flag toggled fully.
+   - Start: `HubConfigEntry.Type = "legacy"` (or other baseline).
+   - Transition: operator edits config to new module type, runs validation.
+   - Result: registry resolves new module and routes all traffic to it immediately.
 
 2. **Cache Strategy Update**
    - Start: Module uses default TTL.

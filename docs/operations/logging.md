@@ -2,10 +2,9 @@
 
 ## Common Fields
 - `hub`/`domain`/`hub_type`：当前 Hub 标识与协议类型，例如 `debian`/`apk`。
-- `module_key`：命中的模块键（非 `legacy` 时表示新模块生效）。
+- `module_key`：命中的模块键（与 `Type` 同名）。
 - `cache_hit`：`true` 表示直接复用缓存；`false` 表示从上游获取或已刷新。
 - `upstream`/`upstream_status`：实际访问的上游地址与状态码。
-- `rollout_flag`：`legacy-only`/`dual`/`modular`，便于排查路由与灰度。
 - `action`：`proxy`，表明代理链路日志。
 
 ## APT (debian 模块)
@@ -19,4 +18,4 @@
 
 ## Quick Checks
 - 观察 `cache_hit` 与 `upstream_status`：`cache_hit=true`、`upstream_status=200/304` 表示缓存复用成功；`cache_hit=false` 表示回源或刷新。
-- 若期望模块日志字段但出现 `module_key":"legacy"`，检查 `Module` 与 `Rollout` 配置是否指向新模块。 
+- 若 `module_key` 与配置的 `Type` 不符，检查该类型的 hook 是否已注册，或是否误用了旧版二进制。

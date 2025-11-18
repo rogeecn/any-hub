@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/any-hub/any-hub/internal/config"
-	"github.com/any-hub/any-hub/internal/hubmodule/legacy"
 )
 
 func TestHubRegistryLookupByHost(t *testing.T) {
@@ -55,8 +54,8 @@ func TestHubRegistryLookupByHost(t *testing.T) {
 	if route.CacheStrategy.ValidationMode == "" {
 		t.Fatalf("cache strategy validation mode should not be empty")
 	}
-	if route.RolloutFlag != legacy.RolloutModular {
-		t.Fatalf("default rollout flag should be modular")
+	if route.ModuleKey != "docker" {
+		t.Fatalf("expected docker module, got %s", route.ModuleKey)
 	}
 
 	if route.UpstreamURL.String() != "https://registry-1.docker.io" {

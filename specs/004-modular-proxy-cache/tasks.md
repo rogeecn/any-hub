@@ -15,7 +15,7 @@
 ## Phase 2: Foundational (Blocking Prerequisites)
 
 - [X] T003 Create shared module interfaces + registry in `internal/hubmodule/interfaces.go` and `internal/hubmodule/registry.go`
-- [X] T004 Extend config schema with `[[Hub]].Module` defaults/validation plus sample configs in `internal/config/{types.go,validation.go,loader.go}` and `configs/*.toml`
+- [X] T004 Extend config schema with module defaults/validation（2025-03 起由 `Type` 直接驱动，`[[Hub]].Module` 已淘汰）
 - [X] T005 [P] Wire server bootstrap to resolve modules once and inject into proxy/cache layers (`internal/server/bootstrap.go`, `internal/proxy/handler.go`)
 
 **Checkpoint**: Registry + config plumbing complete; user story work may begin.
@@ -61,6 +61,8 @@
 
 ## Phase 5: User Story 3 - Operate Mixed Generations During Migration (Priority: P3)
 
+> 2025-03: Rollout flags were removed; this section remains for historical tracking only.
+
 **Goal**: Support dual-path deployments with diagnostics/logging to track legacy vs. modular hubs.
 **Independent Test**: Run mixed legacy/modular hubs, flip rollout flags, and confirm logs + diagnostics show module ownership and allow rollback.
 
@@ -73,7 +75,7 @@
 
 - [X] T019 [US3] Implement `LegacyAdapterState` tracker + rollout flag parsing (`internal/hubmodule/legacy/state.go`, `internal/config/runtime_flags.go`)
 - [X] T020 [US3] Implement Fiber handler + routing for `/−/modules` diagnostics (`internal/server/routes/modules.go`, `internal/server/router.go`)
-- [X] T021 [US3] Add structured log fields (`module_key`, `rollout_flag`) across logging middleware (`internal/server/middleware/logging.go`, `internal/proxy/logging.go`)
+- [X] T021 [US3] Add structured log fields (`module_key`) across logging middleware (`internal/server/middleware/logging.go`, `internal/proxy/logging.go`)
 - [X] T022 [US3] Document operational playbook for phased migration (`docs/operations/migration.md`)
 
 ---

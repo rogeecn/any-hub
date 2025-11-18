@@ -8,7 +8,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
 
-	"github.com/any-hub/any-hub/internal/hubmodule"
 	"github.com/any-hub/any-hub/internal/logging"
 	"github.com/any-hub/any-hub/internal/server"
 )
@@ -133,9 +132,7 @@ func (f *Forwarder) routeFields(route *server.HubRoute, requestID string) logrus
 		route.Config.Type,
 		route.Config.AuthMode(),
 		route.ModuleKey,
-		string(route.RolloutFlag),
 		false,
-		route.ModuleKey == hubmodule.DefaultModuleKey(),
 	)
 	if requestID != "" {
 		fields["request_id"] = requestID

@@ -24,7 +24,7 @@ internal/hubmodule/
 2. 填写模块特有逻辑与缓存策略，并确保包含中文注释解释设计。
 3. 在模块目录添加 `module_test.go`，使用 `httptest.Server` 与 `t.TempDir()` 复现真实流量。
 4. 运行 `make modules-test` 验证模块单元测试。
-5. `[[Hub]].Module` 留空时会优先选择与 `Type` 同名的模块，实际迁移时仍建议显式填写，便于 diagnostics 标记 rollout。
+5. `[[Hub]].Type` 现已直接映射到同名模块；新增模块时记得将类型加入配置校验与示例配置。
 
 ## 术语
 - **Module Key**：模块唯一标识（如 `legacy`、`npm-tarball`）。

@@ -13,7 +13,6 @@ import (
 
 	"github.com/any-hub/any-hub/internal/config"
 	"github.com/any-hub/any-hub/internal/hubmodule"
-	"github.com/any-hub/any-hub/internal/hubmodule/legacy"
 	"github.com/any-hub/any-hub/internal/proxy/hooks"
 	"github.com/any-hub/any-hub/internal/server"
 	"github.com/any-hub/any-hub/internal/server/routes"
@@ -38,20 +37,16 @@ func TestModuleDiagnosticsEndpoints(t *testing.T) {
 		},
 		Hubs: []config.HubConfig{
 			{
-				Name:     "legacy-hub",
-				Domain:   "legacy.local",
-				Type:     "docker",
-				Upstream: "https://registry-1.docker.io",
-				Module:   hubmodule.DefaultModuleKey(),
-				Rollout:  string(legacy.RolloutLegacyOnly),
-			},
-			{
 				Name:     "modern-hub",
 				Domain:   "modern.local",
 				Type:     "npm",
 				Upstream: "https://registry.npmjs.org",
-				Module:   moduleKey,
-				Rollout:  "dual",
+			},
+			{
+				Name:     "docker-hub",
+				Domain:   "docker.local",
+				Type:     "docker",
+				Upstream: "https://registry-1.docker.io",
 			},
 		},
 	}
@@ -77,12 +72,10 @@ func TestModuleDiagnosticsEndpoints(t *testing.T) {
 		var payload struct {
 			Modules []map[string]any `json:"modules"`
 			Hubs    []struct {
-				HubName    string `json:"hub_name"`
-				ModuleKey  string `json:"module_key"`
-				Rollout    string `json:"rollout_flag"`
-				Domain     string `json:"domain"`
-				Port       int    `json:"port"`
-				LegacyOnly bool   `json:"legacy_only"`
+				HubName   string `json:"hub_name"`
+				ModuleKey string `json:"module_key"`
+				Domain    string `json:"domain"`
+				Port      int    `json:"port"`
 			} `json:"hubs"`
 		}
 		body, _ := io.ReadAll(resp.Body)
@@ -111,22 +104,13 @@ func TestModuleDiagnosticsEndpoints(t *testing.T) {
 		}
 		for _, hub := range payload.Hubs {
 			switch hub.HubName {
-			case "legacy-hub":
-				if hub.ModuleKey != hubmodule.DefaultModuleKey() {
-					t.Fatalf("legacy hub should expose legacy module, got %s", hub.ModuleKey)
-				}
-				if !hub.LegacyOnly {
-					t.Fatalf("legacy hub should be marked legacy_only")
-				}
 			case "modern-hub":
-				if hub.ModuleKey != moduleKey {
-					t.Fatalf("modern hub should expose %s, got %s", moduleKey, hub.ModuleKey)
+				if hub.ModuleKey != "npm" {
+					t.Fatalf("modern hub should expose npm, got %s", hub.ModuleKey)
 				}
-				if hub.Rollout != "dual" {
-					t.Fatalf("modern hub rollout flag should be dual, got %s", hub.Rollout)
-				}
-				if hub.LegacyOnly {
-					t.Fatalf("modern hub should not be marked legacy_only")
+			case "docker-hub":
+				if hub.ModuleKey != "docker" {
+					t.Fatalf("docker hub should expose docker, got %s", hub.ModuleKey)
 				}
 			default:
 				t.Fatalf("unexpected hub %s", hub.HubName)
