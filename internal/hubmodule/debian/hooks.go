@@ -64,11 +64,11 @@ func isAptIndexPath(p string) bool {
 	if isByHashPath(clean) {
 		return false
 	}
-	if strings.HasPrefix(clean, "/dists/") {
-		if strings.HasSuffix(clean, "/release") || strings.HasSuffix(clean, "/inrelease") || strings.HasSuffix(clean, "/release.gpg") {
-			return true
-		}
-		if strings.Contains(clean, "/packages") {
+
+	if strings.Contains(clean, "/dists/") {
+		if strings.HasSuffix(clean, "/release") ||
+			strings.HasSuffix(clean, "/inrelease") ||
+			strings.HasSuffix(clean, "/release.gpg") {
 			return true
 		}
 	}
@@ -80,7 +80,7 @@ func isAptImmutablePath(p string) bool {
 	if isByHashPath(clean) {
 		return true
 	}
-	if strings.HasPrefix(clean, "/pool/") {
+	if strings.Contains(clean, "/pool/") {
 		return true
 	}
 	return false
@@ -88,9 +88,10 @@ func isAptImmutablePath(p string) bool {
 
 func isByHashPath(p string) bool {
 	clean := canonicalPath(p)
-	if !strings.HasPrefix(clean, "/dists/") {
+	if strings.Contains(clean, "/dists/") {
 		return false
 	}
+
 	return strings.Contains(clean, "/by-hash/")
 }
 

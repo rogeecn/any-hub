@@ -15,6 +15,14 @@ func TestCachePolicyIndexesRevalidate(t *testing.T) {
 	if !current.AllowCache || !current.AllowStore || !current.RequireRevalidate {
 		t.Fatalf("expected packages index to revalidate")
 	}
+	current = cachePolicy(nil, "/dists/bookworm/main/Contents-amd64.gz", hooks.CachePolicy{})
+	if !current.AllowCache || !current.AllowStore || !current.RequireRevalidate {
+		t.Fatalf("expected contents index to revalidate")
+	}
+	current = cachePolicy(nil, "/debian-security/dists/trixie/Contents-amd64.gz", hooks.CachePolicy{})
+	if !current.AllowCache || !current.AllowStore || !current.RequireRevalidate {
+		t.Fatalf("expected prefixed contents index to revalidate")
+	}
 }
 
 func TestCachePolicyImmutable(t *testing.T) {
@@ -26,6 +34,7 @@ func TestCachePolicyImmutable(t *testing.T) {
 		{name: "by-hash nested", path: "/dists/bookworm/main/binary-amd64/by-hash/SHA256/def"},
 		{name: "pool package", path: "/pool/main/h/hello.deb"},
 		{name: "pool canonicalized", path: " /PoOl/main/../main/h/hello_1.0_amd64.DeB "},
+		{name: "mirror prefix pool", path: "/debian/pool/main/h/hello.deb"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

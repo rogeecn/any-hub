@@ -77,6 +77,7 @@ func TestAptUpdateCachesIndexes(t *testing.T) {
 
 	releasePath := "/dists/bookworm/Release"
 	packagesPath := "/dists/bookworm/main/binary-amd64/Packages.gz"
+	contentsPath := "/dists/bookworm/main/Contents-amd64.gz"
 
 	resp := doRequest(releasePath)
 	if resp.StatusCode != fiber.StatusOK {
@@ -114,6 +115,24 @@ func TestAptUpdateCachesIndexes(t *testing.T) {
 	}
 	pkgResp2.Body.Close()
 
+	contentsResp := doRequest(contentsPath)
+	if contentsResp.StatusCode != fiber.StatusOK {
+		t.Fatalf("expected 200 for contents, got %d", contentsResp.StatusCode)
+	}
+	if contentsResp.Header.Get("X-Any-Hub-Cache-Hit") != "false" {
+		t.Fatalf("expected cache miss for contents")
+	}
+	contentsResp.Body.Close()
+
+	contentsResp2 := doRequest(contentsPath)
+	if contentsResp2.StatusCode != fiber.StatusOK {
+		t.Fatalf("expected 200 for cached contents, got %d", contentsResp2.StatusCode)
+	}
+	if contentsResp2.Header.Get("X-Any-Hub-Cache-Hit") != "true" {
+		t.Fatalf("expected cache hit for contents")
+	}
+	contentsResp2.Body.Close()
+
 	if stub.ReleaseGets() != 1 {
 		t.Fatalf("expected single release GET, got %d", stub.ReleaseGets())
 	}
@@ -126,6 +145,12 @@ func TestAptUpdateCachesIndexes(t *testing.T) {
 	if stub.PackagesHeads() != 1 {
 		t.Fatalf("expected single packages HEAD revalidate, got %d", stub.PackagesHeads())
 	}
+	if stub.ContentsGets() != 1 {
+		t.Fatalf("expected single contents GET, got %d", stub.ContentsGets())
+	}
+	if stub.ContentsHeads() != 1 {
+		t.Fatalf("expected single contents HEAD revalidate, got %d", stub.ContentsHeads())
+	}
 }
 
 type aptStub struct {
@@ -135,14 +160,19 @@ type aptStub struct {
 	mu            sync.Mutex
 	releaseBody   string
 	packagesBody  string
+	contentsBody  string
 	releaseETag   string
 	packagesETag  string
+	contentsETag  string
 	releaseGets   int
 	releaseHeads  int
 	packagesGets  int
 	packagesHeads int
+	contentsGets  int
+	contentsHeads int
 	releasePath   string
 	packagesPath  string
+	contentsPath  string
 }
 
 func newAptStub(t *testing.T) *aptStub {
@@ -150,15 +180,19 @@ func newAptStub(t *testing.T) *aptStub {
 	stub := &aptStub{
 		releaseBody:  "Release-body",
 		packagesBody: "Packages-body",
+		contentsBody: "Contents-body",
 		releaseETag:  "r1",
 		packagesETag: "p1",
+		contentsETag: "c1",
 		releasePath:  "/dists/bookworm/Release",
 		packagesPath: "/dists/bookworm/main/binary-amd64/Packages.gz",
+		contentsPath: "/dists/bookworm/main/Contents-amd64.gz",
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(stub.releasePath, stub.handleRelease)
 	mux.HandleFunc(stub.packagesPath, stub.handlePackages)
+	mux.HandleFunc(stub.contentsPath, stub.handleContents)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -212,6 +246,25 @@ func (s *aptStub) handlePackages(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(s.packagesBody))
 }
 
+func (s *aptStub) handleContents(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if r.Method == http.MethodHead {
+		s.contentsHeads++
+		if matchETag(r, s.contentsETag) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		writeHeaders(w, s.contentsETag)
+		w.Header().Set("Content-Type", "application/gzip")
+		return
+	}
+	s.contentsGets++
+	writeHeaders(w, s.contentsETag)
+	w.Header().Set("Content-Type", "application/gzip")
+	_, _ = w.Write([]byte(s.contentsBody))
+}
+
 func matchETag(r *http.Request, etag string) bool {
 	for _, candidate := range r.Header.Values("If-None-Match") {
 		c := strings.Trim(candidate, "\"")
@@ -249,6 +302,18 @@ func (s *aptStub) PackagesHeads() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.packagesHeads
+}
+
+func (s *aptStub) ContentsGets() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.contentsGets
+}
+
+func (s *aptStub) ContentsHeads() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.contentsHeads
 }
 
 func (s *aptStub) Close() {
