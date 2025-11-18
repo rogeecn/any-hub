@@ -107,6 +107,12 @@ func applyHubDefaults(h *HubConfig) {
 	}
 }
 
+// NormalizeHubConfig 公开给无需依赖 loader 的调用方（例如测试）以填充模块/rollout 默认值。
+func NormalizeHubConfig(h HubConfig) HubConfig {
+	applyHubDefaults(&h)
+	return h
+}
+
 func durationDecodeHook() mapstructure.DecodeHookFunc {
 	targetType := reflect.TypeOf(Duration(0))
 

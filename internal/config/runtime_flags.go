@@ -8,6 +8,13 @@ import (
 	"github.com/any-hub/any-hub/internal/hubmodule/legacy"
 )
 
+// Rollout 字段说明（legacy → modular 平滑迁移控制）：
+// - legacy-only：强制使用 legacy 模块（EffectiveModuleKey → legacy）；用于未迁移或需要快速回滚时。
+// - dual：新模块为默认，保留 legacy 以便诊断/灰度；仅当 Module 非空时生效，否则回退 legacy-only。
+// - modular：仅使用新模块；Module 为空或 legacy 模块时自动回退 legacy-only。
+// 默认行为：未填写 Rollout 时，空 Module/legacy 模块默认 legacy-only；其它模块默认 modular。
+// 影响范围：动态选择执行的模块键（EffectiveModuleKey）、路由日志中的 rollout_flag，方便区分迁移阶段。
+
 // parseRolloutFlag 将配置中的 rollout 字段标准化，并结合模块类型输出最终状态。
 func parseRolloutFlag(raw string, moduleKey string) (legacy.RolloutFlag, error) {
 	normalized := strings.ToLower(strings.TrimSpace(raw))

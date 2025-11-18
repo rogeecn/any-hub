@@ -49,14 +49,14 @@ func TestHubRegistryLookupByHost(t *testing.T) {
 	if route.CacheTTL != cfg.EffectiveCacheTTL(route.Config) {
 		t.Errorf("cache ttl mismatch: got %s", route.CacheTTL)
 	}
-	if route.CacheStrategy.TTLHint != route.CacheTTL {
-		t.Errorf("cache strategy ttl mismatch: %s vs %s", route.CacheStrategy.TTLHint, route.CacheTTL)
+	if route.CacheStrategy.TTLHint != 0 {
+		t.Errorf("cache strategy ttl mismatch: %s vs %s", route.CacheStrategy.TTLHint, time.Duration(0))
 	}
 	if route.CacheStrategy.ValidationMode == "" {
 		t.Fatalf("cache strategy validation mode should not be empty")
 	}
-	if route.RolloutFlag != legacy.RolloutLegacyOnly {
-		t.Fatalf("default rollout flag should be legacy-only")
+	if route.RolloutFlag != legacy.RolloutModular {
+		t.Fatalf("default rollout flag should be modular")
 	}
 
 	if route.UpstreamURL.String() != "https://registry-1.docker.io" {

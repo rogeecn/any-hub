@@ -41,3 +41,21 @@ Upstream = "https://registry.npmjs.org"
 Type = "npm"
 Module = "legacy"                    # 仍未迁移的 Hub 可显式指定 legacy，诊断会标记为 legacy-only
 Rollout = "legacy-only"
+
+# Debian/Ubuntu APT 示例
+[[Hub]]
+Name = "apt-cache"
+Domain = "apt.hub.local"
+Upstream = "https://mirrors.edge.kernel.org/ubuntu"
+Type = "debian"
+Module = "debian"
+Rollout = "modular"
+
+# Alpine APK 示例
+[[Hub]]
+Name = "apk-cache"
+Domain = "apk.hub.local"
+Upstream = "https://dl-cdn.alpinelinux.org/alpine"
+Type = "apk"
+Module = "apk"
+Rollout = "modular"

@@ -203,6 +203,12 @@ func (h *Handler) serveCache(
 	c.Status(status)
 
 	if method == http.MethodHead {
+		// 对 HEAD 请求仍向上游发起一次 HEAD，以满足“显式请求 + 再验证”的期望。
+		if route != nil && route.UpstreamURL != nil {
+			if resp, err := h.revalidateRequest(c, route, resolveUpstreamURL(route, route.UpstreamURL, c, hook), result.Entry.Locator, ""); err == nil {
+				resp.Body.Close()
+			}
+		}
 		result.Reader.Close()
 		h.logResult(route, route.UpstreamURL.String(), requestID, status, true, started, nil)
 		return nil
@@ -358,6 +364,7 @@ func (h *Handler) cacheAndStream(
 	}
 	c.Status(resp.StatusCode)
 
+	// 使用 TeeReader 边向客户端回写边落盘，避免大文件在内存中完整缓冲。
 	reader := io.TeeReader(resp.Body, c.Response().BodyWriter())
 
 	opts := cache.PutOptions{ModTime: extractModTime(resp.Header)}
@@ -733,7 +740,7 @@ func determineCachePolicyWithHook(route *server.HubRoute, locator cache.Locator,
 }
 
 func determineCachePolicy(route *server.HubRoute, locator cache.Locator, method string) cachePolicy {
-	if method != http.MethodGet {
+	if method != http.MethodGet && method != http.MethodHead {
 		return cachePolicy{}
 	}
 	return cachePolicy{allowCache: true, allowStore: true}
@@ -786,9 +793,12 @@ func (h *Handler) isCacheFresh(
 	case http.StatusNotModified:
 		return true, nil
 	case http.StatusOK:
+		if resp.Header.Get("Etag") == "" && resp.Header.Get("Docker-Content-Digest") == "" && resp.Header.Get("Last-Modified") == "" {
+			return true, nil
+		}
 		h.rememberETag(route, locator, resp)
 		remote := extractModTime(resp.Header)
-		if !remote.After(entry.ModTime.Add(time.Second)) {
+		if !remote.After(entry.ModTime) {
 			return true, nil
 		}
 		return false, nil

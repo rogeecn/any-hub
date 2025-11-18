@@ -19,7 +19,7 @@ func init() {
 			"pypi",
 		},
 		CacheStrategy: hubmodule.CacheStrategyProfile{
-			TTLHint:                pypiDefaultTTL,
+			TTLHint:                0, // simple index 每次再验证
 			ValidationMode:         hubmodule.ValidationModeLastModified,
 			DiskLayout:             "raw_path",
 			RequiresMetadataFile:   false,

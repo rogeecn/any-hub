@@ -13,6 +13,7 @@ import (
 
 	"github.com/any-hub/any-hub/internal/config"
 	"github.com/any-hub/any-hub/internal/hubmodule"
+	"github.com/any-hub/any-hub/internal/hubmodule/legacy"
 	"github.com/any-hub/any-hub/internal/proxy/hooks"
 	"github.com/any-hub/any-hub/internal/server"
 	"github.com/any-hub/any-hub/internal/server/routes"
@@ -41,6 +42,8 @@ func TestModuleDiagnosticsEndpoints(t *testing.T) {
 				Domain:   "legacy.local",
 				Type:     "docker",
 				Upstream: "https://registry-1.docker.io",
+				Module:   hubmodule.DefaultModuleKey(),
+				Rollout:  string(legacy.RolloutLegacyOnly),
 			},
 			{
 				Name:     "modern-hub",

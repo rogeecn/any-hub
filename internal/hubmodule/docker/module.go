@@ -19,7 +19,7 @@ func init() {
 			"docker",
 		},
 		CacheStrategy: hubmodule.CacheStrategyProfile{
-			TTLHint:                dockerDefaultTTL,
+			TTLHint:                0, // manifests 需每次再验证，由 ETag 控制新鲜度
 			ValidationMode:         hubmodule.ValidationModeETag,
 			DiskLayout:             "raw_path",
 			RequiresMetadataFile:   false,

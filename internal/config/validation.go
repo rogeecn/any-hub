@@ -16,9 +16,11 @@ var supportedHubTypes = map[string]struct{}{
 	"go":       {},
 	"pypi":     {},
 	"composer": {},
+	"debian":   {},
+	"apk":      {},
 }
 
-const supportedHubTypeList = "docker|npm|go|pypi|composer"
+const supportedHubTypeList = "docker|npm|go|pypi|composer|debian|apk"
 
 // Validate 针对语义级别做进一步校验，防止非法配置启动服务。
 func (c *Config) Validate() error {

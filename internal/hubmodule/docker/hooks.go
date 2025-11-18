@@ -15,9 +15,6 @@ func init() {
 }
 
 func normalizePath(ctx *hooks.RequestContext, clean string, rawQuery []byte) (string, []byte) {
-	if !isDockerHubHost(ctx.UpstreamHost) {
-		return clean, rawQuery
-	}
 	repo, rest, ok := splitDockerRepoPath(clean)
 	if !ok || repo == "" || strings.Contains(repo, "/") || repo == "library" {
 		return clean, rawQuery

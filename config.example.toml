@@ -86,3 +86,21 @@ Username = ""
 Password = ""
 Type = "composer"
 Module = "composer"
+
+# Debian/Ubuntu APT 示例
+[[Hub]]
+Name = "apt-cache"
+Domain = "apt.hub.local"
+Upstream = "https://mirrors.edge.kernel.org/ubuntu"
+Type = "debian"
+Module = "debian"
+Rollout = "modular"
+
+# Alpine APK 示例
+[[Hub]]
+Name = "apk-cache"
+Domain = "apk.hub.local"
+Upstream = "https://dl-cdn.alpinelinux.org/alpine"
+Type = "apk"
+Module = "apk"
+Rollout = "modular"

@@ -2,12 +2,14 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -42,6 +44,7 @@ func TestCacheFlowWithConditionalRequest(t *testing.T) {
 				Name:     "docker",
 				Domain:   "docker.hub.local",
 				Type:     "docker",
+				Module:   "docker",
 				Upstream: upstream.URL,
 			},
 		},
@@ -143,6 +146,7 @@ func TestDockerManifestHeadDoesNotOverwriteCache(t *testing.T) {
 				Name:     "docker",
 				Domain:   "docker.hub.local",
 				Type:     "docker",
+				Module:   "docker",
 				Upstream: upstream.URL,
 			},
 		},
@@ -294,6 +298,7 @@ type cacheFlowStub struct {
 	lastRequest *http.Request
 	body        []byte
 	etag        string
+	etagVer     int
 	lastMod     string
 }
 
@@ -302,6 +307,7 @@ func newCacheFlowStub(t *testing.T, paths ...string) *cacheFlowStub {
 	stub := &cacheFlowStub{
 		body:    []byte("upstream payload"),
 		etag:    `"etag-v1"`,
+		etagVer: 1,
 		lastMod: time.Now().UTC().Format(http.TimeFormat),
 	}
 
@@ -344,6 +350,8 @@ func (s *cacheFlowStub) Close() {
 
 func (s *cacheFlowStub) handle(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
+	etag := s.etag
+	lastMod := s.lastMod
 	if r.Method == http.MethodHead {
 		s.headHits++
 	} else {
@@ -354,15 +362,21 @@ func (s *cacheFlowStub) handle(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodHead {
 		w.Header().Set("Content-Type", "text/plain")
-		w.Header().Set("Etag", s.etag)
-		w.Header().Set("Last-Modified", s.lastMod)
+		w.Header().Set("Etag", etag)
+		w.Header().Set("Last-Modified", lastMod)
+		for _, candidate := range r.Header.Values("If-None-Match") {
+			if strings.Trim(candidate, `"`) == strings.Trim(etag, `"`) {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Etag", s.etag)
-	w.Header().Set("Last-Modified", s.lastMod)
+	w.Header().Set("Etag", etag)
+	w.Header().Set("Last-Modified", lastMod)
 	_, _ = w.Write(s.body)
 }
 
@@ -370,5 +384,7 @@ func (s *cacheFlowStub) UpdateBody(body []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.body = body
-	s.lastMod = time.Now().UTC().Format(http.TimeFormat)
+	s.etagVer++
+	s.etag = fmt.Sprintf(`"etag-v%d"`, s.etagVer)
+	s.lastMod = time.Now().UTC().Add(2 * time.Second).Format(http.TimeFormat)
 }

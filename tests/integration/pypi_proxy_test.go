@@ -239,7 +239,7 @@ func (s *pypiStub) handleWheel(w http.ResponseWriter, r *http.Request) {
 func (s *pypiStub) UpdateSimple(body []byte) {
 	s.mu.Lock()
 	s.simpleBody = append([]byte(nil), body...)
-	s.lastSimpleMod = time.Now().UTC().Format(http.TimeFormat)
+	s.lastSimpleMod = time.Now().UTC().Add(2 * time.Second).Format(http.TimeFormat)
 	s.mu.Unlock()
 }
 

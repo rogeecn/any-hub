@@ -56,6 +56,7 @@ func NewHubRegistry(cfg *config.Config) (*HubRegistry, error) {
 	}
 
 	for _, hub := range cfg.Hubs {
+		hub = config.NormalizeHubConfig(hub)
 		normalizedHost := normalizeDomain(hub.Domain)
 		if normalizedHost == "" {
 			return nil, fmt.Errorf("invalid domain for hub %s", hub.Name)
