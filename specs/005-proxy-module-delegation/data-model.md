@@ -14,7 +14,7 @@
 
 - **Proxy Dispatcher**
   - Attributes: handler map (module_key → handler), default handler fallback.
-  - Behavior: Lookup by route.ModuleKey and invoke handler; wraps errors/logging.
+  - Behavior: Lookup by the hub's module key (derived from Type / route.Module.Key) and invoke handler; wraps errors/logging.
   - Constraints: If handler missing, return 5xx with observable logging.
 
 - **Cache Policy**

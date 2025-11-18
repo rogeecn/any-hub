@@ -65,7 +65,7 @@ func buildHookContext(route *server.HubRoute, c fiber.Ctx) *hooks.RequestContext
 		HubName:      route.Config.Name,
 		Domain:       route.Config.Domain,
 		HubType:      route.Config.Type,
-		ModuleKey:    route.ModuleKey,
+		ModuleKey:    route.Module.Key,
 		UpstreamHost: baseHost,
 		Method:       c.Method(),
 	}
@@ -83,7 +83,7 @@ func hasHook(def hooks.Hooks) bool {
 func (h *Handler) Handle(c fiber.Ctx, route *server.HubRoute) error {
 	started := time.Now()
 	requestID := server.RequestID(c)
-	hooksDef, ok := hooks.Fetch(route.ModuleKey)
+	hooksDef, ok := hooks.Fetch(route.Module.Key)
 	hookCtx := buildHookContext(route, c)
 	rawQuery := append([]byte(nil), c.Request().URI().QueryString()...)
 	cleanPath := normalizeRequestPath(route, string(c.Request().URI().Path()))
@@ -120,7 +120,7 @@ func (h *Handler) Handle(c fiber.Ctx, route *server.HubRoute) error {
 			// miss, continue
 		default:
 			h.logger.WithError(err).
-				WithFields(logrus.Fields{"hub": route.Config.Name, "module_key": route.ModuleKey}).
+				WithFields(logrus.Fields{"hub": route.Config.Name, "module_key": route.Module.Key}).
 				Warn("cache_get_failed")
 		}
 	}
@@ -134,7 +134,7 @@ func (h *Handler) Handle(c fiber.Ctx, route *server.HubRoute) error {
 				fresh, err := h.isCacheFresh(c, route, locator, cached.Entry, &hookState)
 				if err != nil {
 					h.logger.WithError(err).
-						WithFields(logrus.Fields{"hub": route.Config.Name, "module_key": route.ModuleKey}).
+						WithFields(logrus.Fields{"hub": route.Config.Name, "module_key": route.Module.Key}).
 						Warn("cache_revalidate_failed")
 					serve = false
 				} else if !fresh {
@@ -517,7 +517,7 @@ func (h *Handler) logResult(
 		route.Config.Domain,
 		route.Config.Type,
 		route.Config.AuthMode(),
-		route.ModuleKey,
+		route.Module.Key,
 		cacheHit,
 	)
 	fields["action"] = "proxy"
@@ -968,7 +968,7 @@ func (h *Handler) logAuthRetry(route *server.HubRoute, upstream string, requestI
 		route.Config.Domain,
 		route.Config.Type,
 		route.Config.AuthMode(),
-		route.ModuleKey,
+		route.Module.Key,
 		false,
 	)
 	fields["action"] = "proxy_retry"
@@ -987,7 +987,7 @@ func (h *Handler) logAuthFailure(route *server.HubRoute, upstream string, reques
 		route.Config.Domain,
 		route.Config.Type,
 		route.Config.AuthMode(),
-		route.ModuleKey,
+		route.Module.Key,
 		false,
 	)
 	fields["action"] = "proxy"

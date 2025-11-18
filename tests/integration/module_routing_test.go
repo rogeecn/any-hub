@@ -95,6 +95,6 @@ type moduleRecorder struct {
 
 func (p *moduleRecorder) Handle(c fiber.Ctx, route *server.HubRoute) error {
 	p.routeName = route.Config.Name
-	p.moduleKey = route.ModuleKey
+	p.moduleKey = route.Module.Key
 	return c.SendStatus(fiber.StatusNoContent)
 }

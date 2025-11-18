@@ -35,7 +35,7 @@ func RegisterModuleHandler(key string, handler server.ProxyHandler) {
 	MustRegisterModule(ModuleRegistration{Key: key, Handler: handler})
 }
 
-// Handle 实现 server.ProxyHandler，根据 route.ModuleKey 选择 handler。
+// Handle 实现 server.ProxyHandler，根据 route.Module.Key 选择 handler。
 func (f *Forwarder) Handle(c fiber.Ctx, route *server.HubRoute) error {
 	requestID := server.RequestID(c)
 	handler := f.lookup(route)
@@ -90,7 +90,7 @@ func (f *Forwarder) logModuleError(route *server.HubRoute, code string, err erro
 
 func (f *Forwarder) lookup(route *server.HubRoute) server.ProxyHandler {
 	if route != nil {
-		if handler := lookupModuleHandler(route.ModuleKey); handler != nil {
+		if handler := lookupModuleHandler(route.Module.Key); handler != nil {
 			return handler
 		}
 	}
@@ -131,7 +131,7 @@ func (f *Forwarder) routeFields(route *server.HubRoute, requestID string) logrus
 		route.Config.Domain,
 		route.Config.Type,
 		route.Config.AuthMode(),
-		route.ModuleKey,
+		route.Module.Key,
 		false,
 	)
 	if requestID != "" {

@@ -25,9 +25,8 @@ type HubRoute struct {
 	// UpstreamURL/ProxyURL 在构造 Registry 时提前解析完成，便于后续请求快速复用。
 	UpstreamURL *url.URL
 	ProxyURL    *url.URL
-	// ModuleKey/Module 记录当前 hub 选用的模块及其元数据，便于日志与观测。
-	ModuleKey string
-	Module    hubmodule.ModuleMetadata
+	// Module 记录当前 hub 选用的模块元数据，便于日志与观测。
+	Module hubmodule.ModuleMetadata
 	// CacheStrategy 代表模块默认策略与 hub 覆盖后的最终结果。
 	CacheStrategy hubmodule.CacheStrategyProfile
 }
@@ -134,7 +133,6 @@ func buildHubRoute(cfg *config.Config, hub config.HubConfig) (*HubRoute, error) 
 		CacheTTL:      effectiveTTL,
 		UpstreamURL:   upstreamURL,
 		ProxyURL:      proxyURL,
-		ModuleKey:     runtime.Module.Key,
 		Module:        runtime.Module,
 		CacheStrategy: runtime.CacheStrategy,
 	}, nil

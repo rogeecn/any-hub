@@ -113,7 +113,7 @@ func encodeHubBindings(routes []server.HubRoute) []hubBindingPayload {
 	for _, route := range routes {
 		result = append(result, hubBindingPayload{
 			HubName:   route.Config.Name,
-			ModuleKey: route.ModuleKey,
+			ModuleKey: route.Module.Key,
 			Domain:    route.Config.Domain,
 			Port:      route.ListenPort,
 		})

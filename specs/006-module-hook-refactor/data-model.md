@@ -27,7 +27,7 @@
 ## Relationships
 
 - Hub module 注册时同时在 HookRegistry 与 Forwarder handler map 建立关联。
-- ProxyDispatcher 在请求进入后根据 route.ModuleKey 查询 Hook + handler。
+- ProxyDispatcher 在请求进入后根据 route.Module.Key（来自 Hub Type）查询 Hook + handler。
 - Diagnostics 依赖 HookRegistry 与 HubRegistry 联合输出状态。
 
 ## Lifecycle

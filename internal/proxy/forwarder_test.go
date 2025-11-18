@@ -10,6 +10,7 @@ import (
 	"github.com/valyala/fasthttp"
 
 	"github.com/any-hub/any-hub/internal/config"
+	"github.com/any-hub/any-hub/internal/hubmodule"
 	"github.com/any-hub/any-hub/internal/server"
 )
 
@@ -102,6 +103,8 @@ func testRouteWithModule(moduleKey string) *server.HubRoute {
 			Domain: "test.local",
 			Type:   "custom",
 		},
-		ModuleKey: moduleKey,
+		Module: hubmodule.ModuleMetadata{
+			Key: moduleKey,
+		},
 	}
 }

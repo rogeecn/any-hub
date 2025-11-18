@@ -54,8 +54,8 @@ func TestHubRegistryLookupByHost(t *testing.T) {
 	if route.CacheStrategy.ValidationMode == "" {
 		t.Fatalf("cache strategy validation mode should not be empty")
 	}
-	if route.ModuleKey != "docker" {
-		t.Fatalf("expected docker module, got %s", route.ModuleKey)
+	if route.Module.Key != "docker" {
+		t.Fatalf("expected docker module, got %s", route.Module.Key)
 	}
 
 	if route.UpstreamURL.String() != "https://registry-1.docker.io" {

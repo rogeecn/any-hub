@@ -25,70 +25,47 @@ func normalizePath(_ *hooks.RequestContext, p string, rawQuery []byte) (string, 
 
 func cachePolicy(_ *hooks.RequestContext, locatorPath string, current hooks.CachePolicy) hooks.CachePolicy {
 	clean := canonicalPath(locatorPath)
-	switch {
-	case isAptIndexPath(clean):
-		// 索引类（Release/Packages）需要 If-None-Match/If-Modified-Since 再验证。
-		current.AllowCache = true
-		current.AllowStore = true
-		current.RequireRevalidate = true
-	case isAptImmutablePath(clean):
+	if strings.Contains(clean, "/by-hash/") || strings.Contains(clean, "/pool/") {
 		// pool/*.deb 与 by-hash 路径视为不可变，直接缓存后续不再 HEAD。
 		current.AllowCache = true
 		current.AllowStore = true
 		current.RequireRevalidate = false
-	default:
-		current.AllowCache = false
-		current.AllowStore = false
-		current.RequireRevalidate = false
+		return current
 	}
+
+	if strings.Contains(clean, "/dists/") {
+		// 索引类（Release/Packages/Contents）需要 If-None-Match/If-Modified-Since 再验证。
+		if strings.HasSuffix(clean, "/release") ||
+			strings.HasSuffix(clean, "/inrelease") ||
+			strings.HasSuffix(clean, "/release.gpg") {
+			current.AllowCache = true
+			current.AllowStore = true
+			current.RequireRevalidate = true
+			return current
+		}
+	}
+
+	current.AllowCache = false
+	current.AllowStore = false
+	current.RequireRevalidate = false
 	return current
 }
 
 func contentType(_ *hooks.RequestContext, locatorPath string) string {
+	clean := canonicalPath(locatorPath)
 	switch {
-	case strings.HasSuffix(locatorPath, ".gz"):
+	case strings.HasSuffix(clean, ".gz"):
 		return "application/gzip"
-	case strings.HasSuffix(locatorPath, ".xz"):
+	case strings.HasSuffix(clean, ".xz"):
 		return "application/x-xz"
-	case strings.HasSuffix(locatorPath, "Release.gpg"):
+	case strings.HasSuffix(clean, "release.gpg"):
 		return "application/pgp-signature"
-	case isAptIndexPath(locatorPath):
+	case strings.Contains(clean, "/dists/") &&
+		(strings.HasSuffix(clean, "/release") || strings.HasSuffix(clean, "/inrelease")):
 		return "text/plain"
 	default:
 		return ""
 	}
-}
-
-func isAptIndexPath(p string) bool {
-	clean := canonicalPath(p)
-	if isByHashPath(clean) {
-		return false
-	}
-
-	if strings.Contains(clean, "/dists/") {
-		if strings.HasSuffix(clean, "/release") ||
-			strings.HasSuffix(clean, "/inrelease") ||
-			strings.HasSuffix(clean, "/release.gpg") {
-			return true
-		}
-	}
-	return false
-}
-
-func isAptImmutablePath(p string) bool {
-	clean := canonicalPath(p)
-	if isByHashPath(clean) {
-		return true
-	}
-	if strings.Contains(clean, "/pool/") {
-		return true
-	}
-	return false
-}
-
-func isByHashPath(p string) bool {
-	clean := canonicalPath(p)
-	return strings.Contains(clean, "/by-hash/")
 }
 
 func canonicalPath(p string) string {
