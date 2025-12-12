@@ -31,9 +31,12 @@ func NewUpstreamClient(cfg *config.Config) *http.Client {
 		timeout = cfg.Global.UpstreamTimeout.DurationValue()
 	}
 
+	transport := defaultTransport.Clone()
+	// Use UpstreamTimeout as ResponseHeaderTimeout to avoid killing long streaming downloads.
+	transport.ResponseHeaderTimeout = timeout
+
 	return &http.Client{
-		Timeout:   timeout,
-		Transport: defaultTransport.Clone(),
+		Transport: transport,
 	}
 }
 

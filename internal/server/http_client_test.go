@@ -16,8 +16,12 @@ func TestNewUpstreamClientUsesConfigTimeout(t *testing.T) {
 	}
 
 	client := NewUpstreamClient(cfg)
-	if client.Timeout != 45*time.Second {
-		t.Fatalf("expected timeout 45s, got %s", client.Timeout)
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected *http.Transport, got %T", client.Transport)
+	}
+	if transport.ResponseHeaderTimeout != 45*time.Second {
+		t.Fatalf("expected response header timeout 45s, got %s", transport.ResponseHeaderTimeout)
 	}
 }
 

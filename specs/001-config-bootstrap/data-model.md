@@ -15,7 +15,7 @@
   - `MaxMemoryCacheSize` (bytes, optional, default 268435456)
   - `MaxRetries` (int >=0, default 3)
   - `InitialBackoff` (duration, default 1s)
-  - `UpstreamTimeout` (duration, default 30s)
+  - `UpstreamTimeout` (duration, default 30s, used as upstream response header timeout; body can stream longer)
 - **Validation Rules**: 路径必须存在或可创建；数值必须 >0；LogLevel 必须匹配允许枚举。
 - **Relationships**: 被 `Config` 聚合并为 `HubConfig` 提供默认值。
 
