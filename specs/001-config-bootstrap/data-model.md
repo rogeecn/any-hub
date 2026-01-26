@@ -28,7 +28,6 @@
   - `Upstream` (string, required, http/https URL)
   - `Proxy` (string, optional, URL)
   - `CacheTTL` (duration, optional, overrides global)
-  - `EnableHeadCheck` (bool, optional, default true)
 - **Validation Rules**: `Name` 必须唯一；`Domain` + `Port` 组合不得冲突；URL 必须可解析。
 - **Relationships**: 属于 `Config`，在运行时用于初始化路由、缓存目录 `StoragePath/<Name>`。
 

@@ -156,6 +156,7 @@ func registerDockerHandlers(mux *http.ServeMux, blob []byte) {
 func registerNPMHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/lodash", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
 		resp := map[string]any{
 			"name": "lodash",
 			"dist-tags": map[string]string{
@@ -174,6 +175,7 @@ func registerNPMHandlers(mux *http.ServeMux) {
 
 	mux.HandleFunc("/lodash/-/lodash-4.17.21.tgz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
 		_, _ = w.Write([]byte("tarball-bytes"))
 	})
 }

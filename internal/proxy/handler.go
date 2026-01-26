@@ -3,7 +3,7 @@ package proxy
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -202,10 +202,25 @@ func (h *Handler) serveCache(
 	c.Status(status)
 
 	if method == http.MethodHead {
-		// 对 HEAD 请求仍向上游发起一次 HEAD，以满足“显式请求 + 再验证”的期望。
 		if route != nil && route.UpstreamURL != nil {
-			if resp, err := h.revalidateRequest(c, route, resolveUpstreamURL(route, route.UpstreamURL, c, hook), result.Entry.Locator, ""); err == nil {
-				resp.Body.Close()
+			shouldRevalidate := true
+			if hook != nil && hook.hasHooks && hook.def.CachePolicy != nil {
+				policy := hook.def.CachePolicy(hook.ctx, result.Entry.Locator.Path, hooks.CachePolicy{
+					AllowCache:        true,
+					AllowStore:        true,
+					RequireRevalidate: true,
+				})
+				if !policy.AllowCache || !policy.AllowStore {
+					shouldRevalidate = false
+				} else {
+					shouldRevalidate = policy.RequireRevalidate
+				}
+			}
+
+			if shouldRevalidate {
+				if resp, err := h.revalidateRequest(c, route, resolveUpstreamURL(route, route.UpstreamURL, c, hook), result.Entry.Locator, ""); err == nil {
+					resp.Body.Close()
+				}
 			}
 		}
 		result.Reader.Close()
@@ -571,7 +586,7 @@ func resolveContentType(route *server.HubRoute, locator cache.Locator, hook *hoo
 func buildLocator(route *server.HubRoute, c fiber.Ctx, clean string, rawQuery []byte) cache.Locator {
 	query := rawQuery
 	if len(query) > 0 {
-		sum := sha1.Sum(query)
+		sum := sha256.Sum256(query)
 		clean = fmt.Sprintf("%s/__qs/%s", clean, hex.EncodeToString(sum[:]))
 	}
 	loc := cache.Locator{
@@ -791,7 +806,7 @@ func (h *Handler) isCacheFresh(
 		return true, nil
 	case http.StatusOK:
 		if resp.Header.Get("Etag") == "" && resp.Header.Get("Docker-Content-Digest") == "" && resp.Header.Get("Last-Modified") == "" {
-			return true, nil
+			return false, nil
 		}
 		h.rememberETag(route, locator, resp)
 		remote := extractModTime(resp.Header)

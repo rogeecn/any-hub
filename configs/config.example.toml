@@ -21,7 +21,6 @@ Type = "docker"
 Username = ""
 Password = ""
 CacheTTL = 43200
-EnableHeadCheck = true
 
 [[Hub]]
 Name = "composer-cache"

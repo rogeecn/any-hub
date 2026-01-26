@@ -4,7 +4,7 @@
 
 ### HubRoute
 - **Description**: Host/端口到上游仓库的映射，供 Fiber 路由和 Proxy handler 使用。
-- **Fields**: `Name` (string, unique), `Domain` (string, FQDN), `Port` (int, 1-65535), `Upstream` (URL), `Proxy` (URL, optional), `CacheTTL` (duration override), `EnableHeadCheck` (bool).
+- **Fields**: `Name` (string, unique), `Domain` (string, FQDN), `Port` (int, 1-65535), `Upstream` (URL), `Proxy` (URL, optional), `CacheTTL` (duration override).
 - **Validation**: Name 唯一；Domain 不含协议/路径；Upstream 必须 http/https。
 - **Relationships**: 由 config 加载到 `HubRegistry`；与 CacheEntry、ProxyRequest 通过 `Name` 关联。
 

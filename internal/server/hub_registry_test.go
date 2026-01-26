@@ -15,11 +15,10 @@ func TestHubRegistryLookupByHost(t *testing.T) {
 		},
 		Hubs: []config.HubConfig{
 			{
-				Name:            "docker",
-				Domain:          "docker.hub.local",
-				Type:            "docker",
-				Upstream:        "https://registry-1.docker.io",
-				EnableHeadCheck: true,
+				Name:     "docker",
+				Domain:   "docker.hub.local",
+				Type:     "docker",
+				Upstream: "https://registry-1.docker.io",
 			},
 			{
 				Name:     "npm",

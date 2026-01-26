@@ -68,8 +68,8 @@ func TestCacheStrategyOverrides(t *testing.T) {
 		}
 		resp2.Body.Close()
 
-		if headCount := countRequests(stub.Requests(), http.MethodHead, "/lodash"); headCount != 0 {
-			t.Fatalf("expected no HEAD before TTL expiry, got %d", headCount)
+		if headCount := countRequests(stub.Requests(), http.MethodHead, "/lodash"); headCount != 1 {
+			t.Fatalf("expected single HEAD before TTL expiry, got %d", headCount)
 		}
 		if getCount := countRequests(stub.Requests(), http.MethodGet, "/lodash"); getCount != 1 {
 			t.Fatalf("upstream should be hit once before TTL expiry, got %d", getCount)
@@ -85,8 +85,8 @@ func TestCacheStrategyOverrides(t *testing.T) {
 		}
 		resp3.Body.Close()
 
-		if headCount := countRequests(stub.Requests(), http.MethodHead, "/lodash"); headCount != 1 {
-			t.Fatalf("expected single HEAD after TTL expiry, got %d", headCount)
+		if headCount := countRequests(stub.Requests(), http.MethodHead, "/lodash"); headCount != 2 {
+			t.Fatalf("expected two HEAD requests after TTL expiry, got %d", headCount)
 		}
 		if getCount := countRequests(stub.Requests(), http.MethodGet, "/lodash"); getCount != 1 {
 			t.Fatalf("upstream GET count should remain 1, got %d", getCount)

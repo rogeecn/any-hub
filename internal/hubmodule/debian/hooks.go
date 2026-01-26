@@ -37,7 +37,14 @@ func cachePolicy(_ *hooks.RequestContext, locatorPath string, current hooks.Cach
 		// 索引类（Release/Packages/Contents）需要 If-None-Match/If-Modified-Since 再验证。
 		if strings.HasSuffix(clean, "/release") ||
 			strings.HasSuffix(clean, "/inrelease") ||
-			strings.HasSuffix(clean, "/release.gpg") {
+			strings.HasSuffix(clean, "/release.gpg") ||
+			strings.HasSuffix(clean, "/packages") ||
+			strings.HasSuffix(clean, "/packages.gz") ||
+			strings.HasSuffix(clean, "/packages.xz") ||
+			strings.HasSuffix(clean, "/sources") ||
+			strings.HasSuffix(clean, "/sources.gz") ||
+			strings.HasSuffix(clean, "/sources.xz") ||
+			strings.Contains(clean, "/contents-") {
 			current.AllowCache = true
 			current.AllowStore = true
 			current.RequireRevalidate = true

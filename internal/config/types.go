@@ -64,16 +64,15 @@ type GlobalConfig struct {
 
 // HubConfig 决定单个代理实例如何与下游/上游交互。
 type HubConfig struct {
-	Name            string   `mapstructure:"Name"`
-	Domain          string   `mapstructure:"Domain"`
-	Upstream        string   `mapstructure:"Upstream"`
-	Proxy           string   `mapstructure:"Proxy"`
-	Type            string   `mapstructure:"Type"`
-	Username        string   `mapstructure:"Username"`
-	Password        string   `mapstructure:"Password"`
-	CacheTTL        Duration `mapstructure:"CacheTTL"`
-	ValidationMode  string   `mapstructure:"ValidationMode"`
-	EnableHeadCheck bool     `mapstructure:"EnableHeadCheck"`
+	Name           string   `mapstructure:"Name"`
+	Domain         string   `mapstructure:"Domain"`
+	Upstream       string   `mapstructure:"Upstream"`
+	Proxy          string   `mapstructure:"Proxy"`
+	Type           string   `mapstructure:"Type"`
+	Username       string   `mapstructure:"Username"`
+	Password       string   `mapstructure:"Password"`
+	CacheTTL       Duration `mapstructure:"CacheTTL"`
+	ValidationMode string   `mapstructure:"ValidationMode"`
 }
 
 // Config 是 TOML 文件映射的整体结构。
@@ -109,11 +108,12 @@ func CredentialModes(hubs []HubConfig) []string {
 
 // StrategyOverrides 将 hub 层的 TTL/Validation 配置映射为模块策略覆盖项。
 func (h HubConfig) StrategyOverrides(ttl time.Duration) hubmodule.StrategyOptions {
-	opts := hubmodule.StrategyOptions{
-		TTLOverride: ttl,
-	}
+	opts := hubmodule.StrategyOptions{}
 	if mode := strings.TrimSpace(h.ValidationMode); mode != "" {
 		opts.ValidationOverride = hubmodule.ValidationMode(mode)
+	}
+	if h.CacheTTL.DurationValue() > 0 {
+		opts.TTLOverride = ttl
 	}
 	return opts
 }
