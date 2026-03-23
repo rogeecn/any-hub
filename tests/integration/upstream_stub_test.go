@@ -30,6 +30,7 @@ type upstreamStub struct {
 	requests  []RecordedRequest
 	mode      upstreamMode
 	blobBytes []byte
+	lastMod   string
 }
 
 // RecordedRequest 捕获每次请求的方法/路径/Host/Headers，便于断言代理行为。
@@ -48,13 +49,14 @@ func newUpstreamStub(t *testing.T, mode upstreamMode) *upstreamStub {
 	stub := &upstreamStub{
 		mode:      mode,
 		blobBytes: []byte("stub-layer-payload"),
+		lastMod:   time.Now().UTC().Format(http.TimeFormat),
 	}
 
 	switch mode {
 	case upstreamDocker:
 		registerDockerHandlers(mux, stub.blobBytes)
 	case upstreamNPM:
-		registerNPMHandlers(mux)
+		registerNPMHandlers(mux, stub)
 	default:
 		t.Fatalf("unsupported stub mode: %s", mode)
 	}
@@ -153,10 +155,10 @@ func registerDockerHandlers(mux *http.ServeMux, blob []byte) {
 	})
 }
 
-func registerNPMHandlers(mux *http.ServeMux) {
+func registerNPMHandlers(mux *http.ServeMux, stub *upstreamStub) {
 	mux.HandleFunc("/lodash", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+		w.Header().Set("Last-Modified", stub.lastMod)
 		resp := map[string]any{
 			"name": "lodash",
 			"dist-tags": map[string]string{
@@ -175,7 +177,7 @@ func registerNPMHandlers(mux *http.ServeMux) {
 
 	mux.HandleFunc("/lodash/-/lodash-4.17.21.tgz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+		w.Header().Set("Last-Modified", stub.lastMod)
 		_, _ = w.Write([]byte("tarball-bytes"))
 	})
 }
@@ -229,6 +231,37 @@ func TestDockerStubServesManifestAndBlob(t *testing.T) {
 
 	if got := len(stub.Requests()); got != 3 {
 		t.Fatalf("expected 3 recorded requests, got %d", got)
+	}
+}
+
+func TestNPMStubKeepsStableValidatorsAcrossHeadRequests(t *testing.T) {
+	stub := newUpstreamStub(t, upstreamNPM)
+	defer stub.Close()
+
+	req1, err := http.NewRequest(http.MethodHead, stub.URL+"/lodash", nil)
+	if err != nil {
+		t.Fatalf("build first HEAD request: %v", err)
+	}
+	resp1, err := http.DefaultClient.Do(req1)
+	if err != nil {
+		t.Fatalf("first HEAD failed: %v", err)
+	}
+	resp1.Body.Close()
+
+	time.Sleep(1100 * time.Millisecond)
+
+	req2, err := http.NewRequest(http.MethodHead, stub.URL+"/lodash", nil)
+	if err != nil {
+		t.Fatalf("build second HEAD request: %v", err)
+	}
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatalf("second HEAD failed: %v", err)
+	}
+	resp2.Body.Close()
+
+	if resp1.Header.Get("Last-Modified") != resp2.Header.Get("Last-Modified") {
+		t.Fatalf("expected stable Last-Modified, got %q then %q", resp1.Header.Get("Last-Modified"), resp2.Header.Get("Last-Modified"))
 	}
 }
 
