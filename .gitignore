@@ -20,6 +20,7 @@ Thumbs.db
 .vscode/
 .idea/
 .cache/
+.worktrees/
 storage/
 logs/
 tmp/
