@@ -22,6 +22,7 @@ import (
 
 	"github.com/any-hub/any-hub/internal/cache"
 	"github.com/any-hub/any-hub/internal/hubmodule"
+	dockermodule "github.com/any-hub/any-hub/internal/hubmodule/docker"
 	"github.com/any-hub/any-hub/internal/logging"
 	"github.com/any-hub/any-hub/internal/proxy/hooks"
 	"github.com/any-hub/any-hub/internal/server"
@@ -218,7 +219,7 @@ func (h *Handler) serveCache(
 			}
 
 			if shouldRevalidate {
-				if resp, err := h.revalidateRequest(c, route, resolveUpstreamURL(route, route.UpstreamURL, c, hook), result.Entry.Locator, ""); err == nil {
+				if resp, err := h.revalidateRequest(c, route, effectiveRevalidateURL(route, c, result.Entry, hook), result.Entry.Locator, ""); err == nil {
 					resp.Body.Close()
 				}
 			}
@@ -259,6 +260,17 @@ func (h *Handler) fetchAndStream(
 		h.logResult(route, upstreamURL.String(), requestID, 0, false, started, err)
 		return h.writeError(c, fiber.StatusBadGateway, "upstream_failed")
 	}
+	effectiveUpstreamPath := ""
+	originalStatus := resp.StatusCode
+	originalPath := ""
+	if hook != nil {
+		originalPath = hook.clean
+	}
+	resp, upstreamURL, effectiveUpstreamPath, err = h.retryRegistryK8sManifestFallback(c, route, requestID, resp, upstreamURL, hook, originalStatus, originalPath)
+	if err != nil {
+		h.logResult(route, upstreamURL.String(), requestID, 0, false, started, err)
+		return h.writeError(c, fiber.StatusBadGateway, "upstream_failed")
+	}
 	if hook != nil && hook.hasHooks && hook.def.RewriteResponse != nil {
 		if rewritten, rewriteErr := applyHookRewrite(hook, resp, requestPath(c)); rewriteErr == nil {
 			resp = rewritten
@@ -273,7 +285,7 @@ func (h *Handler) fetchAndStream(
 
 	shouldStore := policy.allowStore && writer.Enabled() && isCacheableStatus(resp.StatusCode) &&
 		c.Method() == http.MethodGet
-	return h.consumeUpstream(c, route, locator, resp, shouldStore, writer, requestID, started, ctx)
+	return h.consumeUpstream(c, route, locator, resp, shouldStore, writer, requestID, started, ctx, effectiveUpstreamPath)
 }
 
 func applyHookRewrite(hook *hookState, resp *http.Response, path string) (*http.Response, error) {
@@ -325,13 +337,14 @@ func (h *Handler) consumeUpstream(
 	requestID string,
 	started time.Time,
 	ctx context.Context,
+	effectiveUpstreamPath string,
 ) error {
 	upstreamURL := resp.Request.URL.String()
 	method := c.Method()
 	authFailure := isAuthFailure(resp.StatusCode) && route.Config.HasCredentials()
 
 	if shouldStore {
-		return h.cacheAndStream(c, route, locator, resp, writer, requestID, started, ctx, upstreamURL)
+		return h.cacheAndStream(c, route, locator, resp, writer, requestID, started, ctx, upstreamURL, effectiveUpstreamPath)
 	}
 
 	copyResponseHeaders(c, resp.Header)
@@ -369,6 +382,7 @@ func (h *Handler) cacheAndStream(
 	started time.Time,
 	ctx context.Context,
 	upstreamURL string,
+	effectiveUpstreamPath string,
 ) error {
 	copyResponseHeaders(c, resp.Header)
 	c.Set("X-Any-Hub-Upstream", upstreamURL)
@@ -381,7 +395,7 @@ func (h *Handler) cacheAndStream(
 	// 使用 TeeReader 边向客户端回写边落盘，避免大文件在内存中完整缓冲。
 	reader := io.TeeReader(resp.Body, c.Response().BodyWriter())
 
-	opts := cache.PutOptions{ModTime: extractModTime(resp.Header)}
+	opts := cache.PutOptions{ModTime: extractModTime(resp.Header), EffectiveUpstreamPath: effectiveUpstreamPath}
 	entry, err := writer.Put(ctx, locator, reader, opts)
 	h.logResult(route, upstreamURL, requestID, resp.StatusCode, false, started, err)
 	if err != nil {
@@ -774,7 +788,7 @@ func (h *Handler) isCacheFresh(
 		ctx = context.Background()
 	}
 
-	upstreamURL := resolveUpstreamURL(route, route.UpstreamURL, c, hook)
+	upstreamURL := effectiveRevalidateURL(route, c, entry, hook)
 	resp, err := h.revalidateRequest(c, route, upstreamURL, locator, "")
 	if err != nil {
 		return false, err
@@ -823,6 +837,77 @@ func (h *Handler) isCacheFresh(
 	default:
 		return false, nil
 	}
+}
+
+func effectiveRevalidateURL(route *server.HubRoute, c fiber.Ctx, entry cache.Entry, hook *hookState) *url.URL {
+	if route == nil || route.UpstreamURL == nil || entry.EffectiveUpstreamPath == "" {
+		return resolveUpstreamURL(route, route.UpstreamURL, c, hook)
+	}
+	clone := *route.UpstreamURL
+	clone.Path = entry.EffectiveUpstreamPath
+	clone.RawPath = entry.EffectiveUpstreamPath
+	return &clone
+}
+
+func (h *Handler) retryRegistryK8sManifestFallback(
+	c fiber.Ctx,
+	route *server.HubRoute,
+	requestID string,
+	resp *http.Response,
+	upstreamURL *url.URL,
+	hook *hookState,
+	originalStatus int,
+	originalPath string,
+) (*http.Response, *url.URL, string, error) {
+	if resp == nil || resp.StatusCode != http.StatusNotFound || hook == nil || hook.ctx == nil {
+		return resp, upstreamURL, "", nil
+	}
+	fallbackPath, ok := dockermodule.RegistryK8sManifestFallbackPath(hook.ctx, hook.clean)
+	if !ok {
+		return resp, upstreamURL, "", nil
+	}
+	resp.Body.Close()
+	fallbackHook := *hook
+	fallbackHook.clean = fallbackPath
+	fallbackResp, fallbackURL, err := h.executeRequest(c, route, &fallbackHook)
+	if err != nil {
+		return nil, upstreamURL, "", err
+	}
+	fallbackResp, fallbackURL, err = h.retryOnAuthFailure(c, route, requestID, time.Now(), fallbackResp, fallbackURL, &fallbackHook)
+	if err != nil {
+		return nil, upstreamURL, "", err
+	}
+	h.logRegistryK8sFallback(route, requestID, originalPath, fallbackPath, originalStatus, c.Method())
+	if fallbackResp.StatusCode == http.StatusOK {
+		return fallbackResp, fallbackURL, fallbackPath, nil
+	}
+	return fallbackResp, fallbackURL, "", nil
+}
+
+func (h *Handler) logRegistryK8sFallback(route *server.HubRoute, requestID string, originalPath string, fallbackPath string, originalStatus int, method string) {
+	if route == nil || h == nil || h.logger == nil {
+		return
+	}
+	fields := logging.RequestFields(
+		route.Config.Name,
+		route.Config.Domain,
+		route.Config.Type,
+		route.Config.AuthMode(),
+		route.Module.Key,
+		false,
+	)
+	fields["action"] = "proxy_fallback"
+	if route.UpstreamURL != nil {
+		fields["upstream_host"] = route.UpstreamURL.Hostname()
+	}
+	fields["original_path"] = originalPath
+	fields["fallback_path"] = fallbackPath
+	fields["original_status"] = originalStatus
+	fields["method"] = method
+	if requestID != "" {
+		fields["request_id"] = requestID
+	}
+	h.logger.WithFields(fields).Info("proxy_registry_k8s_fallback")
 }
 
 func (h *Handler) revalidateRequest(

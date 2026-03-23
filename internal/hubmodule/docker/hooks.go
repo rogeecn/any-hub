@@ -87,6 +87,10 @@ func manifestFallbackPath(ctx *hooks.RequestContext, clean string) (string, bool
 	return "/v2/" + repo + "/" + repo + rest, true
 }
 
+func RegistryK8sManifestFallbackPath(ctx *hooks.RequestContext, clean string) (string, bool) {
+	return manifestFallbackPath(ctx, clean)
+}
+
 func splitDockerRepoPath(path string) (string, string, bool) {
 	if !strings.HasPrefix(path, "/v2/") {
 		return "", "", false
