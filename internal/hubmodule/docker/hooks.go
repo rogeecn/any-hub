@@ -69,6 +69,24 @@ func isDockerHubHost(host string) bool {
 	}
 }
 
+func isRegistryK8sHost(host string) bool {
+	if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+		host = parsedHost
+	}
+	return strings.EqualFold(host, "registry.k8s.io")
+}
+
+func manifestFallbackPath(ctx *hooks.RequestContext, clean string) (string, bool) {
+	if ctx == nil || !isRegistryK8sHost(ctx.UpstreamHost) {
+		return "", false
+	}
+	repo, rest, ok := splitDockerRepoPath(clean)
+	if !ok || strings.Contains(repo, "/") || !strings.HasPrefix(rest, "/manifests/") {
+		return "", false
+	}
+	return "/v2/" + repo + "/" + repo + rest, true
+}
+
 func splitDockerRepoPath(path string) (string, string, bool) {
 	if !strings.HasPrefix(path, "/v2/") {
 		return "", "", false
