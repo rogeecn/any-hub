@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -49,6 +50,10 @@ type entryLock struct {
 	refs int
 }
 
+type entryMetadata struct {
+	EffectiveUpstreamPath string `json:"effective_upstream_path,omitempty"`
+}
+
 func (s *fileStore) Get(ctx context.Context, locator Locator) (*ReadResult, error) {
 	select {
 	case <-ctx.Done():
@@ -85,6 +90,12 @@ func (s *fileStore) Get(ctx context.Context, locator Locator) (*ReadResult, erro
 		FilePath:  filePath,
 		SizeBytes: info.Size(),
 		ModTime:   info.ModTime(),
+	}
+	if metadata, err := s.readMetadata(filePath); err == nil {
+		entry.EffectiveUpstreamPath = metadata.EffectiveUpstreamPath
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		file.Close()
+		return nil, err
 	}
 	return &ReadResult{Entry: entry, Reader: file}, nil
 }
@@ -133,12 +144,16 @@ func (s *fileStore) Put(ctx context.Context, locator Locator, body io.Reader, op
 	if err := os.Chtimes(filePath, modTime, modTime); err != nil {
 		return nil, err
 	}
+	if err := s.writeMetadata(filePath, opts.EffectiveUpstreamPath); err != nil {
+		return nil, err
+	}
 
 	entry := Entry{
-		Locator:   locator,
-		FilePath:  filePath,
-		SizeBytes: written,
-		ModTime:   modTime,
+		Locator:               locator,
+		FilePath:              filePath,
+		SizeBytes:             written,
+		ModTime:               modTime,
+		EffectiveUpstreamPath: opts.EffectiveUpstreamPath,
 	}
 	return &entry, nil
 }
@@ -155,6 +170,54 @@ func (s *fileStore) Remove(ctx context.Context, locator Locator) error {
 		return err
 	}
 	if err := os.Remove(filePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if err := os.Remove(metadataPath(filePath)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func (s *fileStore) readMetadata(filePath string) (entryMetadata, error) {
+	raw, err := os.ReadFile(metadataPath(filePath))
+	if err != nil {
+		return entryMetadata{}, err
+	}
+	var metadata entryMetadata
+	if err := json.Unmarshal(raw, &metadata); err != nil {
+		return entryMetadata{}, err
+	}
+	return metadata, nil
+}
+
+func (s *fileStore) writeMetadata(filePath string, effectiveUpstreamPath string) error {
+	metaFilePath := metadataPath(filePath)
+	if effectiveUpstreamPath == "" {
+		if err := os.Remove(metaFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	data, err := json.Marshal(entryMetadata{EffectiveUpstreamPath: effectiveUpstreamPath})
+	if err != nil {
+		return err
+	}
+	tempFile, err := os.CreateTemp(filepath.Dir(metaFilePath), ".cache-meta-*")
+	if err != nil {
+		return err
+	}
+	tempName := tempFile.Name()
+	if _, err := tempFile.Write(data); err != nil {
+		tempFile.Close()
+		_ = os.Remove(tempName)
+		return err
+	}
+	if err := tempFile.Close(); err != nil {
+		_ = os.Remove(tempName)
+		return err
+	}
+	if err := os.Rename(tempName, metaFilePath); err != nil {
+		_ = os.Remove(tempName)
 		return err
 	}
 	return nil
@@ -247,4 +310,8 @@ func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) (int64, 
 
 func locatorKey(locator Locator) string {
 	return locator.HubName + "::" + locator.Path
+}
+
+func metadataPath(filePath string) string {
+	return filePath + ".meta"
 }

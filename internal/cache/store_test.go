@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -59,6 +60,28 @@ func TestStoreRemove(t *testing.T) {
 	}
 	if _, err := store.Get(context.Background(), locator); err == nil || err != ErrNotFound {
 		t.Fatalf("expected not found after remove, got %v", err)
+	}
+}
+
+func TestStorePersistsEffectiveUpstreamPath(t *testing.T) {
+	store := newTestStore(t)
+	locator := Locator{HubName: "docker", Path: "/v2/coredns/manifests/v1.13.1"}
+
+	_, err := store.Put(context.Background(), locator, strings.NewReader("body"), PutOptions{
+		EffectiveUpstreamPath: "/v2/coredns/coredns/manifests/v1.13.1",
+	})
+	if err != nil {
+		t.Fatalf("put error: %v", err)
+	}
+
+	result, err := store.Get(context.Background(), locator)
+	if err != nil {
+		t.Fatalf("get error: %v", err)
+	}
+	defer result.Reader.Close()
+
+	if result.Entry.EffectiveUpstreamPath != "/v2/coredns/coredns/manifests/v1.13.1" {
+		t.Fatalf("unexpected effective upstream path: %q", result.Entry.EffectiveUpstreamPath)
 	}
 }
 

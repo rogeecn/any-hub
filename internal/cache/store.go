@@ -26,7 +26,8 @@ type Store interface {
 
 // PutOptions 控制写入过程中的可选属性。
 type PutOptions struct {
-	ModTime time.Time
+	ModTime               time.Time
+	EffectiveUpstreamPath string
 }
 
 // Locator 唯一定位一个缓存条目（Hub + 相对路径），所有路径均为 URL 路径风格。
@@ -37,10 +38,11 @@ type Locator struct {
 
 // Entry 表示一次缓存命中结果，包含绝对文件路径及文件信息。
 type Entry struct {
-	Locator   Locator `json:"locator"`
-	FilePath  string  `json:"file_path"`
-	SizeBytes int64   `json:"size_bytes"`
-	ModTime   time.Time
+	Locator               Locator   `json:"locator"`
+	FilePath              string    `json:"file_path"`
+	SizeBytes             int64     `json:"size_bytes"`
+	ModTime               time.Time `json:"mod_time"`
+	EffectiveUpstreamPath string    `json:"effective_upstream_path,omitempty"`
 }
 
 // ReadResult 组合 Entry 与正文 Reader，便于代理层直接将 Body 流式返回。
