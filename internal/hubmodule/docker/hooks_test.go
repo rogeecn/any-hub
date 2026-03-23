@@ -19,6 +19,14 @@ func TestNormalizePathAddsLibraryForDockerHub(t *testing.T) {
 	}
 }
 
+func TestNormalizePathSkipsLibraryForNonDockerHub(t *testing.T) {
+	ctx := &hooks.RequestContext{UpstreamHost: "registry.k8s.io"}
+	path, _ := normalizePath(ctx, "/v2/kube-apiserver/manifests/v1.35.3", nil)
+	if path != "/v2/kube-apiserver/manifests/v1.35.3" {
+		t.Fatalf("expected non-docker hub path to remain unchanged, got %s", path)
+	}
+}
+
 func TestSplitDockerRepoPath(t *testing.T) {
 	repo, rest, ok := splitDockerRepoPath("/v2/library/nginx/manifests/latest")
 	if !ok || repo != "library/nginx" || rest != "/manifests/latest" {

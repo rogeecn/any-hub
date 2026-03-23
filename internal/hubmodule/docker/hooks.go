@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"net"
 	"strings"
 
 	"github.com/any-hub/any-hub/internal/proxy/hooks"
@@ -15,6 +16,9 @@ func init() {
 }
 
 func normalizePath(ctx *hooks.RequestContext, clean string, rawQuery []byte) (string, []byte) {
+	if ctx == nil || !isDockerHubHost(ctx.UpstreamHost) {
+		return clean, rawQuery
+	}
 	repo, rest, ok := splitDockerRepoPath(clean)
 	if !ok || repo == "" || strings.Contains(repo, "/") || repo == "library" {
 		return clean, rawQuery
@@ -54,6 +58,9 @@ func contentType(_ *hooks.RequestContext, locatorPath string) string {
 }
 
 func isDockerHubHost(host string) bool {
+	if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+		host = parsedHost
+	}
 	switch strings.ToLower(host) {
 	case "registry-1.docker.io", "docker.io", "index.docker.io":
 		return true

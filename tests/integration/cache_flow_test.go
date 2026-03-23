@@ -222,8 +222,8 @@ func TestDockerManifestHeadDoesNotOverwriteCache(t *testing.T) {
 	}
 }
 
-func TestDockerNamespaceFallbackAddsLibrary(t *testing.T) {
-	stub := newCacheFlowStub(t, dockerManifestPath)
+func TestDockerNonDockerHubUpstreamKeepsOriginalPath(t *testing.T) {
+	stub := newCacheFlowStub(t, dockerManifestNoNamespacePath)
 	defer stub.Close()
 
 	storageDir := t.TempDir()
@@ -277,7 +277,7 @@ func TestDockerNamespaceFallbackAddsLibrary(t *testing.T) {
 	}
 	if resp.StatusCode != fiber.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200 when fallback applies, got %d (body=%s)", resp.StatusCode, string(body))
+		t.Fatalf("expected 200 when upstream keeps original path, got %d (body=%s)", resp.StatusCode, string(body))
 	}
 	resp.Body.Close()
 
